@@ -28,14 +28,6 @@ export function validarClube(value: unknown, line: number): ClubeNormalizado {
 
   const clube = normalizarClube(value);
 
-  if (clube.club_id === VAZIO) {
-    throw new Error(`campo "club_id" ausente ou inválido`);
-  }
-
-  if (clube.name === VAZIO) {
-    throw new Error(`campo "name" ausente ou inválido`);
-  }
-
   return clube;
 }
 
