@@ -20,7 +20,13 @@ export const INTERVALO_PROGRESSO = 100_000;
 export const VAZIO = "";
 
 /** Junta listas de escalares (ex.: cores) em um único campo de texto. */
-export const SEPARADOR_LISTA = ", ";
+export const SEPARADOR_LISTA = "|";
+
+/**
+ * Separadores aceitos quando a lista chega como texto ("preto, branco" em vez
+ * de `["preto", "branco"]`), para que os valores não virem um item só.
+ */
+export const SEPARADORES_ENTRADA = /[,;|/]+/;
 
 /**
  * Só clubes destes campeonatos entram na leitura. Os valores ficam na forma

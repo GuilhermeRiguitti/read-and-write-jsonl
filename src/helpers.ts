@@ -1,4 +1,4 @@
-import { PADRAO_DATA, SEPARADOR_LISTA, VAZIO } from "./constants.ts";
+import { PADRAO_DATA, SEPARADOR_LISTA, SEPARADORES_ENTRADA, VAZIO } from "./constants.ts";
 
 /**
  * Funções pequenas e sem dependência de domínio, usadas por mais de um módulo.
@@ -25,11 +25,6 @@ export function mensagemDoErro(cause: unknown): string {
  */
 export function ehObjeto(valor: unknown): valor is Record<string, unknown> {
   return typeof valor === "object" && valor !== null && !Array.isArray(valor);
-}
-
-/** Mesma checagem, mas para seguir a leitura: o que não é objeto virar `{}`. */
-export function comoObjeto(valor: unknown): Record<string, unknown> {
-  return ehObjeto(valor) ? valor : {};
 }
 
 /**
@@ -111,24 +106,42 @@ function existeNoCalendario(ano: number, mes: number, dia: number): boolean {
 }
 
 /**
- * Lista ausente ou nula virar lista vazia. Um valor presente que não é lista é
- * incoerência de formato, não campo faltando: sinaliza erro para a linha inteira
- * ser reportada e descartada.
+ * Coleção de registros vinda do JSON, tolerante ao formato.
+ *
+ * Lista virar ela mesma; um objeto solto virar lista de um (registro único
+ * escrito fora da lista); qualquer outra coisa — ausente, nula, escalar — virar
+ * lista vazia. Formato inesperado não invalida a linha: quem não tem os dados é
+ * o campo, não o registro inteiro.
  */
-export function normalizarLista(valor: unknown, campo: string): unknown[] {
-  if (valor === undefined || valor === null) return [];
-  if (!Array.isArray(valor)) throw new Error(`campo "${campo}" deveria ser uma lista`);
-  return valor;
+export function normalizarLista(valor: unknown): unknown[] {
+  if (Array.isArray(valor)) return valor;
+  if (ehObjeto(valor)) return [valor];
+
+  return [];
 }
 
-/** Lista de escalares virar texto único ("preto, branco"); vazia virar vazio. */
-export function normalizarListaTexto(valor: unknown, campo: string): string {
-  const itens = normalizarLista(valor, campo);
-  if (itens.length === 0) return VAZIO;
+/**
+ * Lista de escalares virar texto único ("preto|branco").
+ *
+ * O campo nem sempre chega como lista: pode vir string vazia, um valor só
+ * (`"preto"`) ou vários já colados num texto (`"preto, branco"`). Todos são
+ * aceitos, porque descartar a linha por causa da forma do campo perderia dados
+ * que estão ali. Só o que não tem representação escalar (objeto, lista aninhada)
+ * é que some, item a item.
+ */
+export function normalizarListaTexto(valor: unknown): string {
+  const itens = Array.isArray(valor) ? valor : [valor];
 
-  return itens
-    .map(normalizarTexto)
-    .filter((item) => item !== VAZIO)
-    .join(SEPARADOR_LISTA);
+  return itens.flatMap((item) => separarTexto(normalizarTexto(item))).join(SEPARADOR_LISTA);
+}
+
+/** Um texto só pode trazer vários valores ("preto, branco"): vira lista. */
+function separarTexto(texto: string): string[] {
+  if (texto === VAZIO) return [];
+
+  return texto
+    .split(SEPARADORES_ENTRADA)
+    .map((parte) => parte.trim())
+    .filter((parte) => parte !== VAZIO);
 }
 

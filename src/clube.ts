@@ -2,7 +2,6 @@ import type { ClubeNormalizado } from "./models/clube.ts";
 import type { JogadorNormalizado } from "./models/jogador.ts";
 import {
   chaveDeTexto,
-  comoObjeto,
   ehObjeto,
   normalizarData,
   normalizarLista,
@@ -33,10 +32,11 @@ export function ehClubeElegivel(value: unknown): boolean {
 /**
  * Valida e normaliza uma linha do JSONL de clubes.
  *
- * Só duas coisas invalidam a linha inteira: não ser um objeto JSON e não ter
- * identificação (`club_id`/`name`) — sem elas o registro não é aproveitável.
- * Todo o resto é normalizado: campo ausente, nulo ou fora do formato esperado
- * vira string vazia, e a leitura segue.
+ * Uma única coisa invalida a linha inteira: não ser um objeto JSON — aí não há
+ * registro nenhum para aproveitar. Todo o resto é normalizado: campo ausente,
+ * nulo ou fora do formato esperado (cores como texto, lista onde se esperava
+ * escalar) vira string vazia ou lista vazia, e a leitura segue. Formato torto
+ * de um campo custa aquele campo, nunca o registro.
  *
  * Lança em caso de linha inválida; quem chama (o leitor) já captura, reporta e
  * passa para a próxima linha.
@@ -66,10 +66,12 @@ function normalizarClube(bruto: Record<string, unknown>): ClubeNormalizado {
     stadium: normalizarTexto(bruto.stadium),
     president: normalizarTexto(bruto.president),
     nickname: normalizarTexto(bruto.nickname),
-    colors: normalizarListaTexto(bruto.colors, "colors"),
-    players: normalizarLista(bruto.players, "players").map((jogador) =>
-      normalizarJogador(comoObjeto(jogador), club_id),
-    ),
+    colors: normalizarListaTexto(bruto.colors),
+    // Item que não é objeto não descreve jogador nenhum: sai da lista em vez de
+    // virar um bloco com todos os campos vazios.
+    players: normalizarLista(bruto.players)
+      .filter(ehObjeto)
+      .map((jogador) => normalizarJogador(jogador, club_id)),
   };
 }
 
