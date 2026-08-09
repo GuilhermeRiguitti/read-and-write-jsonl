@@ -8,8 +8,7 @@
     "dev": "node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "typecheck": "tsc -p tsconfig.test.json",
-    "test": "node --test \"test/**/*.test.ts\""
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
@@ -17,8 +16,5 @@
   "devDependencies": {
     "@types/node": "^26.2.0",
     "typescript": "^7.0.2"
-  },
-  "dependencies": {
-    "xlsx": "^0.18.5"
   }
 }

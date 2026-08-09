@@ -1,5 +1,5 @@
-import { once } from "node:events";
 import type { Writable } from "node:stream";
+import { LIMITE_BUFFER_SAIDA } from "./constants.ts";
 
 export type Escritor = {
   /**
@@ -10,15 +10,13 @@ export type Escritor = {
   flush(): Promise<void>;
 };
 
-const LIMITE_PADRAO = 64 * 1024;
-
 /**
  * Aqui o texto é agrupado em blocos de ~64 KiB (menos syscalls, mais vazão) e,
  * quando o destino sinaliza que está cheio, a escrita espera o `drain` antes de
  * continuar. Isso também segura o laço de leitura: o arquivo só avança no ritmo
  * em que a saída é consumida.
  */
-export function criarEscritor(stream: Writable, limite: number = LIMITE_PADRAO): Escritor {
+export function criarEscritor(stream: Writable, limite: number = LIMITE_BUFFER_SAIDA): Escritor {
   let partes: string[] = [];
   let tamanho = 0;
 
@@ -30,7 +28,7 @@ export function criarEscritor(stream: Writable, limite: number = LIMITE_PADRAO):
     tamanho = 0;
 
     if (!stream.write(dados) && stream.writable) {
-      await once(stream, "drain");
+      await esperarDrain(stream);
     }
   }
 
@@ -43,4 +41,41 @@ export function criarEscritor(stream: Writable, limite: number = LIMITE_PADRAO):
     },
     flush,
   };
+}
+
+/**
+ * Espera o destino liberar espaço, mas sem ficar preso para sempre: se o stream
+ * fechar ou falhar antes do `drain`, rejeita para o erro subir e a execução
+ * terminar com mensagem — em vez de a leitura travar em silêncio.
+ *
+ * Os listeners são removidos em qualquer um dos desfechos: com milhões de
+ * registros, deixar listener pendurado a cada bloco vazaria memória.
+ */
+function esperarDrain(stream: Writable): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const limpar = (): void => {
+      stream.off("drain", aoDrain);
+      stream.off("close", aoFechar);
+      stream.off("error", aoFalhar);
+    };
+
+    const aoDrain = (): void => {
+      limpar();
+      resolve();
+    };
+
+    const aoFechar = (): void => {
+      limpar();
+      reject(new Error("a saída foi fechada antes de todo o conteúdo ser escrito"));
+    };
+
+    const aoFalhar = (erro: Error): void => {
+      limpar();
+      reject(erro);
+    };
+
+    stream.once("drain", aoDrain);
+    stream.once("close", aoFechar);
+    stream.once("error", aoFalhar);
+  });
 }

@@ -1,7 +1,39 @@
 import { createReadStream } from "node:fs";
 import { StringDecoder } from "node:string_decoder";
-import type { JsonlResult, LineValidator, ReadJsonlOptions } from "./types.ts";
-import { CHUNK_SIZE_PADRAO, MAX_LINE_LENGTH_PADRAO, RAW_PREVIEW_PADRAO } from "./constants.ts";
+import { CHUNK_SIZE, MAX_LINE_LENGTH, RAW_PREVIEW_LENGTH } from "./constants.ts";
+import { mensagemDoErro } from "./helpers.ts";
+
+/** Linha lida e convertida com sucesso. */
+export type JsonlOk<T> = {
+  ok: true;
+  line: number;
+  value: T;
+};
+
+/** Linha incoerente: JSON inválido, fora do formato esperado ou grande demais. */
+export type JsonlFailure = {
+  ok: false;
+  line: number;
+  raw: string;
+  reason: string;
+};
+
+export type JsonlResult<T> = JsonlOk<T> | JsonlFailure;
+
+/**
+ * Valida/converte o JSON já parseado de uma linha. Deve lançar quando o
+ * conteúdo não fizer sentido: o leitor captura e reporta a linha como inválida.
+ */
+export type LineValidator<T> = (value: unknown, line: number) => T;
+
+export type ReadJsonlOptions<T> = {
+  validate?: LineValidator<T>;
+};
+
+/** Saída da tokenização interna, antes de virar JSON. */
+type LinhaBruta =
+  | { line: number; overflow: false; text: string }
+  | { line: number; overflow: true; chars: number; preview: string };
 
 /**
  * Lê um arquivo JSONL de forma incremental.
@@ -19,9 +51,7 @@ export async function* readJsonlFile<T = unknown>(
   filePath: string,
   options: ReadJsonlOptions<T> = {},
 ): AsyncGenerator<JsonlResult<T>> {
-  const stream = createReadStream(filePath, {
-    highWaterMark: options.chunkSize ?? CHUNK_SIZE_PADRAO,
-  });
+  const stream = createReadStream(filePath, { highWaterMark: CHUNK_SIZE });
 
   try {
     yield* readJsonlStream<T>(stream, options);
@@ -31,51 +61,28 @@ export async function* readJsonlFile<T = unknown>(
   }
 }
 
-/** Mesma leitura incremental sobre qualquer stream (stdin, rede, gzip...). */
-export async function* readJsonlStream<T = unknown>(
+/**
+ * Etapa de leitura propriamente dita, separada da abertura do arquivo
+ */
+async function* readJsonlStream<T = unknown>(
   source: AsyncIterable<Buffer | string>,
   options: ReadJsonlOptions<T> = {},
 ): AsyncGenerator<JsonlResult<T>> {
-  const preview = options.rawPreviewLength ?? RAW_PREVIEW_PADRAO;
-
-  for await (const linha of separarLinhas(source, options.maxLineLength ?? MAX_LINE_LENGTH_PADRAO, preview)) {
+  for await (const linha of separarLinhas(source)) {
     if (linha.overflow) {
       yield {
         ok: false,
         line: linha.line,
         raw: linha.preview,
-        reason: `linha excede o limite de ${options.maxLineLength ?? MAX_LINE_LENGTH_PADRAO} caracteres (${linha.chars} descartados)`,
+        reason: `linha excede o limite de ${MAX_LINE_LENGTH} caracteres (${linha.chars} descartados)`,
       };
       continue;
     }
 
     if (linha.text.trim() === "") continue;
-    yield parseLine(linha.text, linha.line, preview, options.validate);
+    yield parseLine(linha.text, linha.line, options.validate);
   }
 }
-
-/**
- * Mesma lógica sobre linhas já em memória (string única ou lista de linhas).
- * Útil em testes; para arquivos grandes prefira `readJsonlFile`.
- */
-export async function* readJsonlLines<T = unknown>(
-  input: string | Iterable<string> | AsyncIterable<string>,
-  options: ReadJsonlOptions<T> = {},
-): AsyncGenerator<JsonlResult<T>> {
-  const preview = options.rawPreviewLength ?? RAW_PREVIEW_PADRAO;
-  const source = typeof input === "string" ? input.split(/\r?\n/) : input;
-
-  let line = 0;
-  for await (const raw of source) {
-    line += 1;
-    if (raw.trim() === "") continue;
-    yield parseLine(raw, line, preview, options.validate);
-  }
-}
-
-type LinhaBruta =
-  | { line: number; overflow: false; text: string }
-  | { line: number; overflow: true; chars: number; preview: string };
 
 /**
  * Quebra o stream em linhas mantendo apenas o resto do bloco atual em memória.
@@ -84,11 +91,7 @@ type LinhaBruta =
  * conteúdo é jogado fora na hora e o resto da linha é consumido sem acumular,
  * até a próxima quebra de linha.
  */
-async function* separarLinhas(
-  source: AsyncIterable<Buffer | string>,
-  maxLineLength: number,
-  previewLength: number,
-): AsyncGenerator<LinhaBruta> {
+async function* separarLinhas(source: AsyncIterable<Buffer | string>): AsyncGenerator<LinhaBruta> {
   const decoder = new StringDecoder("utf8");
 
   let pendente = "";
@@ -134,10 +137,10 @@ async function* separarLinhas(
     if (descartando) {
       descartados += pendente.length;
       pendente = "";
-    } else if (pendente.length > maxLineLength) {
+    } else if (pendente.length > MAX_LINE_LENGTH) {
       descartando = true;
       descartados = pendente.length;
-      preview = pendente.slice(0, previewLength);
+      preview = pendente.slice(0, RAW_PREVIEW_LENGTH);
       pendente = "";
     }
   }
@@ -156,18 +159,13 @@ function semCarriageReturn(texto: string): string {
   return texto.endsWith("\r") ? texto.slice(0, -1) : texto;
 }
 
-function parseLine<T>(
-  raw: string,
-  line: number,
-  previewLength: number,
-  validate?: LineValidator<T>,
-): JsonlResult<T> {
+function parseLine<T>(raw: string, line: number, validate?: LineValidator<T>): JsonlResult<T> {
   let parsed: unknown;
 
   try {
     parsed = JSON.parse(raw);
   } catch (cause) {
-    return { ok: false, line, raw: resumir(raw, previewLength), reason: `JSON inválido: ${messageOf(cause)}` };
+    return { ok: false, line, raw: resumir(raw), reason: `JSON inválido: ${mensagemDoErro(cause)}` };
   }
 
   if (!validate) {
@@ -177,16 +175,12 @@ function parseLine<T>(
   try {
     return { ok: true, line, value: validate(parsed, line) };
   } catch (cause) {
-    return { ok: false, line, raw: resumir(raw, previewLength), reason: messageOf(cause) };
+    return { ok: false, line, raw: resumir(raw), reason: mensagemDoErro(cause) };
   }
 }
 
 /** Guarda só um trecho da linha inválida — o original é liberado em seguida. */
-function resumir(raw: string, limite: number): string {
+function resumir(raw: string): string {
   const linha = raw.trim();
-  return linha.length > limite ? `${linha.slice(0, limite)}...` : linha;
-}
-
-function messageOf(cause: unknown): string {
-  return cause instanceof Error ? cause.message : String(cause);
+  return linha.length > RAW_PREVIEW_LENGTH ? `${linha.slice(0, RAW_PREVIEW_LENGTH)}...` : linha;
 }

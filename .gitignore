@@ -41,3 +41,6 @@ Desktop.ini
 # Arquivos temporários do Excel (xlsx)
 ~$*.xlsx
 ~$*.xls
+
+#TODO
+TODO.md

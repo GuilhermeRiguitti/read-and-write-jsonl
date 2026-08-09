@@ -1,37 +1,76 @@
-import type { Clube } from "./types.ts";
+import type { ClubeNormalizado } from "./models/clube.ts";
+import type { JogadorNormalizado } from "./models/jogador.ts";
+import {
+  comoObjeto,
+  ehObjeto,
+  normalizarData,
+  normalizarLista,
+  normalizarListaTexto,
+  normalizarTexto,
+} from "./helpers.ts";
+import { VAZIO } from "./constants.ts";
 
 /**
- * Checagem mínima de coerência de uma linha do JSONL de clubes: precisa ser um
- * objeto com identificação e com `players` em formato de lista. O resto dos
- * campos é confiado ao arquivo de origem por enquanto.
+ * Valida e normaliza uma linha do JSONL de clubes.
+ *
+ * Só duas coisas invalidam a linha inteira: não ser um objeto JSON e não ter
+ * identificação (`club_id`/`name`) — sem elas o registro não é aproveitável.
+ * Todo o resto é normalizado: campo ausente, nulo ou fora do formato esperado
+ * vira string vazia, e a leitura segue.
+ *
+ * Lança em caso de linha inválida; quem chama (o leitor) já captura, reporta e
+ * passa para a próxima linha.
  */
-export function validarClube(value: unknown, line: number): Clube {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+export function validarClube(value: unknown, line: number): ClubeNormalizado {
+  if (!ehObjeto(value)) {
     throw new Error(`linha ${line} não é um objeto JSON`);
   }
 
-  const clube = value as Partial<Clube>;
+  const clube = normalizarClube(value);
 
-  if (typeof clube.club_id !== "string" || clube.club_id === "") {
+  if (clube.club_id === VAZIO) {
     throw new Error(`campo "club_id" ausente ou inválido`);
   }
 
-  if (typeof clube.name !== "string" || clube.name === "") {
+  if (clube.name === VAZIO) {
     throw new Error(`campo "name" ausente ou inválido`);
   }
 
-  // Normaliza as listas no próprio objeto recém-parseado: com milhões de
-  // registros, uma cópia por linha só geraria pressão de GC à toa. Garantir aqui
-  // que `players` e `colors` sempre existem evita que uma linha sem esses campos
-  // exploda lá na frente, no consumo.
-  clube.players = normalizarLista(clube.players, "players");
-  clube.colors = normalizarLista(clube.colors, "colors");
-
-  return clube as Clube;
+  return clube;
 }
 
-function normalizarLista<T>(valor: T[] | undefined, campo: string): T[] {
-  if (valor === undefined || valor === null) return [];
-  if (!Array.isArray(valor)) throw new Error(`campo "${campo}" deveria ser uma lista`);
-  return valor;
+/** Mapeia o registro bruto para os campos de saída, todos como texto. */
+function normalizarClube(bruto: Record<string, unknown>): ClubeNormalizado {
+  const club_id = normalizarTexto(bruto.club_id);
+
+  return {
+    club_id,
+    name: normalizarTexto(bruto.name),
+    championship: normalizarTexto(bruto.championship),
+    founding_date: normalizarData(bruto.founding_date),
+    city: normalizarTexto(bruto.city),
+    state: normalizarTexto(bruto.state),
+    country: normalizarTexto(bruto.country),
+    stadium: normalizarTexto(bruto.stadium),
+    president: normalizarTexto(bruto.president),
+    nickname: normalizarTexto(bruto.nickname),
+    colors: normalizarListaTexto(bruto.colors, "colors"),
+    players: normalizarLista(bruto.players, "players").map((jogador) =>
+      normalizarJogador(comoObjeto(jogador), club_id),
+    ),
+  };
+}
+
+/** O jogador não carrega o clube no JSONL: o id vem do registro pai. */
+function normalizarJogador(bruto: Record<string, unknown>, club_id: string): JogadorNormalizado {
+  return {
+    club_id,
+    player_id: normalizarTexto(bruto.player_id),
+    name: normalizarTexto(bruto.name),
+    age: normalizarTexto(bruto.age),
+    goals: normalizarTexto(bruto.goals),
+    debut_date: normalizarData(bruto.debut_date),
+    position: normalizarTexto(bruto.position),
+    shirt_number: normalizarTexto(bruto.shirt_number),
+  };
 }
