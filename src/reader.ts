@@ -13,12 +13,20 @@ export type JsonlOk<T> = {
 /** Linha incoerente: JSON inválido, fora do formato esperado ou grande demais. */
 export type JsonlFailure = {
   ok: false;
+  skipped?: false;
   line: number;
   raw: string;
   reason: string;
 };
 
-export type JsonlResult<T> = JsonlOk<T> | JsonlFailure;
+/**
+ * Linha descartada pelo `filter`: não é sucesso (nada a entregar) nem falha
+ * (o arquivo está correto, o registro é que não interessa). Merece um terceiro
+ * caso para quem consome não ter de contá-la como erro.
+ */
+export type JsonlSkipped = { ok: false; skipped: true; line: number };
+
+export type JsonlResult<T> = JsonlOk<T> | JsonlFailure | JsonlSkipped;
 
 /**
  * Valida/converte o JSON já parseado de uma linha. Deve lançar quando o
@@ -26,8 +34,15 @@ export type JsonlResult<T> = JsonlOk<T> | JsonlFailure;
  */
 export type LineValidator<T> = (value: unknown, line: number) => T;
 
+/**
+ * Decide se a linha interessa. Retornando `false`, a linha é descartada sem
+ * passar pelo validador — nem entra no custo de normalizar, nem no de reportar.
+ */
+export type LineFilter = (value: unknown, line: number) => boolean;
+
 export type ReadJsonlOptions<T> = {
   validate?: LineValidator<T>;
+  filter?: LineFilter;
 };
 
 /** Saída da tokenização interna, antes de virar JSON. */
@@ -46,6 +61,9 @@ type LinhaBruta =
  * Como é um async generator, o `for await` de quem consome também aplica
  * contrapressão: enquanto o registro atual está sendo processado, nada novo é
  * lido do disco.
+ *
+ * O `filter` opcional roda logo após o `JSON.parse`, antes da validação: a
+ * linha recusada sai como `JsonlSkipped` e não conta como erro.
  */
 export async function* readJsonlFile<T = unknown>(
   filePath: string,
@@ -80,7 +98,7 @@ async function* readJsonlStream<T = unknown>(
     }
 
     if (linha.text.trim() === "") continue;
-    yield parseLine(linha.text, linha.line, options.validate);
+    yield parseLine(linha.text, linha.line, options);
   }
 }
 
@@ -159,13 +177,20 @@ function semCarriageReturn(texto: string): string {
   return texto.endsWith("\r") ? texto.slice(0, -1) : texto;
 }
 
-function parseLine<T>(raw: string, line: number, validate?: LineValidator<T>): JsonlResult<T> {
+function parseLine<T>(raw: string, line: number, options: ReadJsonlOptions<T>): JsonlResult<T> {
+  const { validate, filter } = options;
   let parsed: unknown;
 
   try {
     parsed = JSON.parse(raw);
   } catch (cause) {
     return { ok: false, line, raw: resumir(raw), reason: `JSON inválido: ${mensagemDoErro(cause)}` };
+  }
+
+  // O filtro vem antes do validador de propósito: o que não interessa não paga
+  // o custo de ser normalizado nem corre o risco de ser reportado como erro.
+  if (filter && !filter(parsed, line)) {
+    return { ok: false, skipped: true, line };
   }
 
   if (!validate) {

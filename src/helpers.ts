@@ -51,6 +51,21 @@ export function normalizarTexto(valor: unknown): string {
 }
 
 /**
+ * Reduz um texto à forma usada em comparação de valor conhecido.
+ *
+ * O arquivo real não é consistente na grafia: `"Série A"`, `"série  a"` e
+ * `" Serie B "` são o mesmo campeonato. Comparar cru descartaria clube válido,
+ * então acento, caixa e espaço repetido são achatados antes de comparar.
+ */
+export function chaveDeTexto(valor: unknown): string {
+  return normalizarTexto(valor)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+}
+
+/**
  * Normaliza data em duas etapas, caindo para vazio quando qualquer uma falha:
  *
  * 1. formato — o texto precisa casar com `PADRAO_DATA`;

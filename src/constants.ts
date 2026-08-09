@@ -23,6 +23,12 @@ export const VAZIO = "";
 export const SEPARADOR_LISTA = ", ";
 
 /**
+ * Só clubes destes campeonatos entram na leitura. Os valores ficam na forma
+ * comparável produzida por `chaveDeTexto` (caixa alta, sem acento).
+ */
+export const CAMPEONATOS_ACEITOS = new Set(["SERIE A", "SERIE B"]);
+
+/**
  * Formatos de data aceitos na entrada: `YYYY-MM-DD` e a mesma data seguida de
  * um horário UTC (`YYYY-MM-DDTHH:MM:SSZ`, com frações de segundo opcionais). O
  * horário é aceito e descartado — só a parte da data vai para a saída.

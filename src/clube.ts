@@ -1,6 +1,7 @@
 import type { ClubeNormalizado } from "./models/clube.ts";
 import type { JogadorNormalizado } from "./models/jogador.ts";
 import {
+  chaveDeTexto,
   comoObjeto,
   ehObjeto,
   normalizarData,
@@ -8,7 +9,26 @@ import {
   normalizarListaTexto,
   normalizarTexto,
 } from "./helpers.ts";
-import { VAZIO } from "./constants.ts";
+import { CAMPEONATOS_ACEITOS, VAZIO } from "./constants.ts";
+
+/**
+ * Decide se o registro bruto interessa, antes de qualquer validação ou
+ * normalização: só clubes de Série A ou Série B seguem adiante.
+ *
+ * Trabalha sobre o valor cru justamente para que registro fora do escopo —
+ * inclusive linha mal formada, que nem objeto é — não chegue a ser normalizado
+ * nem reportado como erro. Campeonato ausente, nulo ou vazio também fica de
+ * fora: sem o campo não há como afirmar que é A ou B, e chutar produziria
+ * informação errada na saída.
+ */
+export function ehClubeElegivel(value: unknown): boolean {
+  if (!ehObjeto(value)) return false;
+
+  const campeonato = chaveDeTexto(value.championship);
+  if (campeonato === VAZIO) return false;
+
+  return CAMPEONATOS_ACEITOS.has(campeonato);
+}
 
 /**
  * Valida e normaliza uma linha do JSONL de clubes.

@@ -1,6 +1,6 @@
 import { readJsonlFile } from "./reader.ts";
 import { criarEscritor } from "./writer.ts";
-import { validarClube } from "./clube.ts";
+import { ehClubeElegivel, validarClube } from "./clube.ts";
 import { FILE_SOURCE, INTERVALO_PROGRESSO } from "./constants.ts";
 import { mensagemDoErro } from "./helpers.ts";
 import type { ClubeNormalizado } from "./models/clube.ts";
@@ -20,6 +20,7 @@ async function main(): Promise<void> {
   await log.write(`Lendo JSONL: ${caminho}\n`);
 
   let lidos = 0;
+  let ignorados = 0;
   let invalidos = 0;
   let picoRss = 0;
   let falha = "";
@@ -29,12 +30,18 @@ async function main(): Promise<void> {
   // permissão, erro de disco, saída fechada no meio. Nesses casos o laço é
   // interrompido com mensagem clara e o resumo parcial ainda é impresso.
   try {
-    for await (const resultado of readJsonlFile<ClubeNormalizado>(caminho, { validate: validarClube })) {
+    const opcoes = { validate: validarClube, filter: ehClubeElegivel };
+
+    for await (const resultado of readJsonlFile<ClubeNormalizado>(caminho, opcoes)) {
       if (resultado.ok) {
         // O clube é formatado, escrito e sai de escopo aqui: nada é acumulado
         // entre iterações, então o coletor libera o registro antes da próxima.
         await saida.write(formatarClube(resultado.line, resultado.value));
         lidos += 1;
+      } else if (resultado.skipped) {
+        // Clube de outro campeonato não é erro: fica só no contador, porque num
+        // arquivo grande a maioria das linhas cairia aqui e afogaria o stderr.
+        ignorados += 1;
       } else {
         invalidos += 1;
         await log.write(
@@ -43,10 +50,12 @@ async function main(): Promise<void> {
         );
       }
 
-      if ((lidos + invalidos) % INTERVALO_PROGRESSO === 0) {
+      if ((lidos + ignorados + invalidos) % INTERVALO_PROGRESSO === 0) {
         const rss = process.memoryUsage().rss;
         picoRss = Math.max(picoRss, rss);
-        await log.write(`... ${lidos + invalidos} linhas processadas (rss ${mb(rss)} MB)\n`);
+        await log.write(
+          `... ${lidos + ignorados + invalidos} linhas processadas (rss ${mb(rss)} MB)\n`,
+        );
       }
     }
 
@@ -64,7 +73,8 @@ async function main(): Promise<void> {
   }
 
   await log.write(
-    `\nResumo: ${lidos} clube(s) lido(s), ${invalidos} linha(s) com erro.\n` +
+    `\nResumo: ${lidos} clube(s) lido(s), ${ignorados} ignorado(s) por campeonato, ` +
+    `${invalidos} linha(s) com erro.\n` +
     `Tempo: ${segundos.toFixed(2)}s | pico de memória (rss): ${mb(picoRss)} MB\n`,
   );
   await log.flush();
