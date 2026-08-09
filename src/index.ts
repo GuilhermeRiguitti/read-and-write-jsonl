@@ -1,65 +1,111 @@
-import { readJsonlFile } from "./jsonl/reader.ts";
-import { validarClube, type Clube } from "./clubes/clube.ts";
-
-const CAMINHO_PADRAO = "sample_clubes.jsonl";
+import { readJsonlFile } from "./reader.ts";
+import { criarEscritor } from "./writer.ts";
+import { validarClube } from "./clube.ts";
+import type { Clube } from "./types.ts";
+import { FILE_SOURCE, INTERVALO_PROGRESSO } from "./constants.ts";
 
 async function main(): Promise<void> {
-  const caminho = process.argv[2] ?? CAMINHO_PADRAO;
+  const caminho = process.argv[2] ?? FILE_SOURCE;
 
-  console.log(`Lendo JSONL: ${caminho}\n`);
+  // Registros vão para o stdout; diagnóstico (progresso, erros, resumo) para o
+  // stderr, para que a saída continue utilizável em pipe.
+  const saida = criarEscritor(process.stdout);
+  // Buffer menor no diagnóstico: menos texto pendente a perder se o processo
+  // morrer, sem abrir mão do agrupamento das escritas.
+  const log = criarEscritor(process.stderr, 4 * 1024);
+
+  ignorarPipeFechado(process.stdout);
+
+  await log.write(`Lendo JSONL: ${caminho}\n`);
 
   let lidos = 0;
   let invalidos = 0;
+  let picoRss = 0;
+  const inicio = performance.now();
 
   for await (const resultado of readJsonlFile<Clube>(caminho, { validate: validarClube })) {
-    if (!resultado.ok) {
+    if (resultado.ok) {
+      lidos += 1;
+      // O clube é formatado, escrito e sai de escopo aqui: nada é acumulado
+      // entre iterações, então o coletor libera o registro antes da próxima.
+      await saida.write(formatarClube(resultado.line, resultado.value));
+    } else {
       invalidos += 1;
-      console.error(`[linha ${resultado.line}] ERRO: ${resultado.reason}`);
-      console.error(`[linha ${resultado.line}] conteúdo: ${resumir(resultado.raw)}`);
-      continue;
+      await log.write(
+        `[linha ${resultado.line}] ERRO: ${resultado.reason}\n` +
+        `[linha ${resultado.line}] conteúdo: ${resultado.raw}\n`,
+      );
     }
 
-    lidos += 1;
-    imprimirClube(resultado.line, resultado.value);
+    if ((lidos + invalidos) % INTERVALO_PROGRESSO === 0) {
+      const rss = process.memoryUsage().rss;
+      picoRss = Math.max(picoRss, rss);
+      await log.write(`... ${lidos + invalidos} linhas processadas (rss ${mb(rss)} MB)\n`);
+    }
   }
 
-  console.log(`\nResumo: ${lidos} clube(s) lido(s), ${invalidos} linha(s) com erro.`);
+  await saida.flush();
+
+  picoRss = Math.max(picoRss, process.memoryUsage().rss);
+  const segundos = (performance.now() - inicio) / 1000;
+
+  await log.write(
+    `\nResumo: ${lidos} clube(s) lido(s), ${invalidos} linha(s) com erro.\n` +
+    `Tempo: ${segundos.toFixed(2)}s | pico de memória (rss): ${mb(picoRss)} MB\n`,
+  );
+  await log.flush();
 }
 
-function imprimirClube(line: number, clube: Clube): void {
-  console.log(`\n[linha ${line}] Clube:`);
-  console.log(`  club_id: ${clube.club_id}`);
-  console.log(`  name: ${clube.name}`);
-  console.log(`  championship: ${clube.championship}`);
-  console.log(`  founding_date: ${clube.founding_date}`);
-  console.log(`  city: ${clube.city}`);
-  console.log(`  state: ${clube.state}`);
-  console.log(`  country: ${clube.country}`);
-  console.log(`  stadium: ${clube.stadium}`);
-  console.log(`  president: ${clube.president}`);
-  console.log(`  nickname: ${clube.nickname ?? "(sem apelido)"}`);
-  console.log(`  colors: ${clube.colors.join(", ")}`);
-  console.log(`  titles: ${clube.titles}`);
+/**
+ * Mapeia o registro para os campos de saída. Campos presentes no JSONL mas fora
+ * dessa lista (titles, nationality, market_value) são ignorados de propósito.
+ */
+function formatarClube(line: number, clube: Clube): string {
+  const linhas = [
+    ``,
+    `[linha ${line}] Clube:`,
+    `  Id do Clube: ${clube.club_id}`,
+    `  Nome: ${clube.name}`,
+    `  Campeonato: ${clube.championship}`,
+    `  Data de Fundação: ${clube.founding_date}`,
+    `  Cidade: ${clube.city}`,
+    `  Estado: ${clube.state}`,
+    `  País: ${clube.country}`,
+    `  Estádio: ${clube.stadium}`,
+    `  Presidente: ${clube.president}`,
+    `  Apelido: ${clube.nickname ?? "(sem apelido)"}`,
+    `  Cores: ${clube.colors.join(", ")}`,
+  ];
 
   for (const jogador of clube.players) {
-    console.log(`\n  Jogador:`);
-    console.log(`     player_id: ${jogador.player_id}`);
-    console.log(`     name: ${jogador.name}`);
-    console.log(`     age: ${jogador.age}`);
-    console.log(`     goals: ${jogador.goals}`);
-    console.log(`     debut_date: ${jogador.debut_date}`);
-    console.log(`     position: ${jogador.position}`);
-    console.log(`     shirt_number: ${jogador.shirt_number}`);
-    console.log(`     nationality: ${jogador.nationality}`);
-    console.log(`     market_value: ${jogador.market_value}`);
+    linhas.push(
+      ``,
+      `  Jogador:`,
+      `     Id do Clube: ${clube.club_id}`,
+      `     Id do Jogador: ${jogador.player_id}`,
+      `     Nome: ${jogador.name}`,
+      `     Idade: ${jogador.age}`,
+      `     Gols: ${jogador.goals}`,
+      `     Data de Estreia: ${jogador.debut_date}`,
+      `     Posição: ${jogador.position}`,
+      `     Número da Camisa: ${jogador.shirt_number}`,
+    );
   }
 
-  console.log("================================");
+  linhas.push(`================================`, ``);
+  return linhas.join("\n");
 }
 
-function resumir(raw: string, limite = 120): string {
-  const linha = raw.trim();
-  return linha.length > limite ? `${linha.slice(0, limite)}...` : linha;
+function mb(bytes: number): string {
+  return (bytes / 1024 / 1024).toFixed(1);
+}
+
+/** `node index.ts arquivo.jsonl | head` não deve virar exceção. */
+function ignorarPipeFechado(stream: NodeJS.WriteStream): void {
+  stream.on("error", (erro: NodeJS.ErrnoException) => {
+    if (erro.code === "EPIPE") process.exit(0);
+    throw erro;
+  });
 }
 
 await main();

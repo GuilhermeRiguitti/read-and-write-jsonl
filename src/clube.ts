@@ -1,30 +1,4 @@
-export type Jogador = {
-  player_id: string;
-  name: string;
-  age: number;
-  goals: number;
-  debut_date: string;
-  position: string;
-  shirt_number: number;
-  nationality: string;
-  market_value: number;
-};
-
-export type Clube = {
-  club_id: string;
-  name: string;
-  championship: string;
-  founding_date: string;
-  city: string;
-  state: string;
-  country: string;
-  stadium: string;
-  president: string;
-  nickname: string | null;
-  colors: string[];
-  titles: number;
-  players: Jogador[];
-};
+import type { Clube } from "./types.ts";
 
 /**
  * Checagem mínima de coerência de uma linha do JSONL de clubes: precisa ser um
@@ -46,9 +20,18 @@ export function validarClube(value: unknown, line: number): Clube {
     throw new Error(`campo "name" ausente ou inválido`);
   }
 
-  if (clube.players !== undefined && !Array.isArray(clube.players)) {
-    throw new Error(`campo "players" deveria ser uma lista`);
-  }
+  // Normaliza as listas no próprio objeto recém-parseado: com milhões de
+  // registros, uma cópia por linha só geraria pressão de GC à toa. Garantir aqui
+  // que `players` e `colors` sempre existem evita que uma linha sem esses campos
+  // exploda lá na frente, no consumo.
+  clube.players = normalizarLista(clube.players, "players");
+  clube.colors = normalizarLista(clube.colors, "colors");
 
-  return { ...(clube as Clube), players: clube.players ?? [] };
+  return clube as Clube;
+}
+
+function normalizarLista<T>(valor: T[] | undefined, campo: string): T[] {
+  if (valor === undefined || valor === null) return [];
+  if (!Array.isArray(valor)) throw new Error(`campo "${campo}" deveria ser uma lista`);
+  return valor;
 }
