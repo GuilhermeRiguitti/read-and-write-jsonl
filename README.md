@@ -47,16 +47,6 @@ Para desenvolvimento local (sem build):
 npm run dev -- sample_clubes.jsonl
 ```
 
-### Testes e verificação de tipos
-
-```bash
-npm test
-npm run typecheck
-```
-
-`npm test` compila `src/` para `dist/` e roda testes unitários + um E2E que
-compara a saída do `sample_clubes.jsonl` com os CSVs versionados no repositório.
-
 ### Saída
 
 Os arquivos `clubs.csv` e `players.csv` são gravados no **diretório de trabalho
@@ -74,6 +64,31 @@ inválidas não alteram o código de saída — são contadas e o processamento 
 
 O caminho de entrada é conferido **antes** de abrir os CSVs, para que um erro de
 digitação não apague o resultado da execução anterior.
+
+---
+
+## Testes e verificação de tipos
+
+```bash
+npm test
+npm run typecheck
+```
+
+`npm test` compila `src/` para `dist/` e roda testes unitários + um E2E.
+
+O teste E2E compara a saída gerada a partir de `sample_clubes.jsonl` com
+`clubs.csv` e `players.csv` na **raiz do repositório**. Esses dois arquivos
+precisam existir antes de rodar os testes — são a referência esperada, não são
+produzidos automaticamente pelo `npm test`.
+
+Para gerá-los (ou atualizá-los após mudança de regra):
+
+```bash
+npm run build
+npm start -- sample_clubes.jsonl
+```
+
+Os testes unitários (`clube`, `helpers`, `reader`) **não** dependem desses CSVs.
 
 ---
 
@@ -115,7 +130,8 @@ docs/
 
 ## Uso de IA
 
-Desenvolvido com apoio de assistente de IA. Sessões em
+Desenvolvido com apoio de assistente de IA. A ferramenta também foi usada neste
+README, nos comentários e na escrita dos testes. Sessões em
 [`docs/conversa-ia/`](docs/conversa-ia/):
 
 | Quando | Sessão | Sobre |

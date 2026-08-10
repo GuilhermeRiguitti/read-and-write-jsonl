@@ -12,7 +12,7 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "pretest": "npm run build",
-    "test": "tsx --test tests/**/*.test.ts",
+    "test": "tsx --test tests/clube.test.ts tests/e2e.test.ts tests/helpers.test.ts tests/reader.test.ts",
     "typecheck": "tsc"
   },
   "keywords": ["jsonl", "csv", "etl", "batch"],

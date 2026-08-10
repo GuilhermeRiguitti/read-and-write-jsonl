@@ -11,8 +11,7 @@ ficam recolhidas em blocos que abrem no clique.
 | 09/08/2026, 20:45 | [Fase 3](fase-3.md) | saída em CSV | 2 | 50 |
 | 10/08/2026, 09:55 | [Buffer do log](simplificar-buffer-log.md) | remover buffer customizado de 4 KiB no stderr | 1 | 3 |
 
-As três **fases** são onde o programa foi construído. A fase 1 foi retomada ao
-longo de dois dias; a tabela está ordenada pelo início de cada sessão.
+As três **fases** são onde o programa foi construído.
 
 Em volta destas correram outras conversas de pequenos ajustes e dúvidas ao longo
 da criação da aplicação.
