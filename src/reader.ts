@@ -11,12 +11,6 @@ export type LinhaLida<T> = {
 
 /**
  * Linha incoerente: JSON inválido, fora do formato esperado ou grande demais.
- *
- * Devolve o número da linha e nada mais. O motivo e um trecho do conteúdo
- * chegaram a existir aqui, mas numa base grande com muitos registros ruins o
- * relatório linha a linha afoga o stderr — mesmo motivo pelo qual as linhas
- * recusadas pelo filtro também não são listadas. O que sobra é a contagem, no
- * resumo do fim da execução.
  */
 export type LinhaInvalida = {
   ok: false;
@@ -62,17 +56,6 @@ type LinhaBruta =
 /**
  * Lê um arquivo JSONL de forma incremental.
  *
- * O arquivo nunca é carregado inteiro: o disco é lido em blocos, cada linha
- * completa é emitida e imediatamente descartada do buffer. O consumo de memória
- * fica limitado a (bloco de leitura + a maior linha em andamento), independente
- * de o arquivo ter 6 ou 60 milhões de registros.
- *
- * Como é um async generator, o `for await` de quem consome também aplica
- * contrapressão: enquanto o registro atual está sendo processado, nada novo é
- * lido do disco.
- *
- * O `filtrar` opcional roda logo após o `JSON.parse`, antes da validação: a
- * linha recusada sai como `LinhaIgnorada` e não conta como erro.
  */
 export async function* lerArquivoJsonl<T = unknown>(
   caminho: string,
@@ -109,9 +92,6 @@ async function* lerFluxoJsonl<T = unknown>(
 /**
  * Quebra o stream em linhas mantendo apenas o resto do bloco atual em memória.
  *
- * Ao contrário do `readline`, aplica um teto por linha: passando do limite, o
- * conteúdo é jogado fora na hora e o resto da linha é consumido sem acumular,
- * até a próxima quebra de linha.
  */
 async function* separarLinhas(origem: AsyncIterable<Buffer | string>): AsyncGenerator<LinhaBruta> {
   const decoder = new StringDecoder("utf8");

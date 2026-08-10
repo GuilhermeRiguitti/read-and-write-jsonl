@@ -62,8 +62,7 @@ export type EscritorCsv<T> = {
 /**
  * Escreve registros em um CSV, um objeto por linha.
  *
- * A contrapressão é a mesma do `criarEscritor`, só que atravessando dois streams:
- * quando o arquivo enche, o `pipeline` para de puxar do stringifier, o buffer
+ * Quando o arquivo enche, o `pipeline` para de puxar do stringifier, o buffer
  * dele fecha e o `write` daqui devolve a Promise que segura o laço de leitura no
  * ritmo do disco.
  */
@@ -71,10 +70,6 @@ export function criarEscritorCsv<T>(
   caminho: string,
   colunas: ReadonlyArray<string | ColumnOption>,
 ): EscritorCsv<T> {
-  // O padrão do `createWriteStream` é 16 KiB; subir para a mesma faixa do
-  // `criarEscritor` dá ao stream mais escritas em voo para reagrupar em um
-  // `_writev`, em vez de pagar uma syscall por registro — o stringifier emite um
-  // pedaço por registro. O lado legível dele acompanha, pelo mesmo motivo.
   const arquivo = createWriteStream(caminho, { highWaterMark: LIMITE_BUFFER_SAIDA });
   const csv = stringify({
     header: true,
@@ -82,9 +77,6 @@ export function criarEscritorCsv<T>(
     readableHighWaterMark: LIMITE_BUFFER_SAIDA,
   });
 
-  // `pipeline` e não `pipe`: `pipe` engole o erro do arquivo (disco cheio, sem
-  // permissão) e o programa terminaria dizendo que escreveu o que não escreveu.
-  //
   // A falha é guardada em vez de ficar como rejeição solta, porque ela pode
   // acontecer no meio do laço, muito antes de alguém dar `await` na Promise: sem
   // o `catch`, o processo morreria de unhandled rejection sem mensagem.
@@ -101,9 +93,7 @@ export function criarEscritorCsv<T>(
     },
 
     /**
-     * Encerra o stringifier e espera o `pipeline` terminar. Só depois disso o
-     * conteúdo está de fato em disco — anunciar o resumo antes seria mentir
-     * sobre o que foi escrito.
+     * Encerra o stringifier e espera o `pipeline` terminar.
      */
     async close(): Promise<void> {
       csv.end();

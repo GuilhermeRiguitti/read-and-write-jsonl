@@ -107,14 +107,6 @@ function existeNoCalendario(ano: number, mes: number, dia: number): boolean {
 
 /**
  * Une uma lista de escalares em um único texto ("preto|branco").
- *
- * Itens sem representação escalar (objeto, lista aninhada) saem da lista, em vez
- * de virarem `[object Object]` no meio do campo.
- *
- * Um valor escalar solto, fora de lista (`"preto"`), é aproveitado como está —
- * é o mesmo dado, só sem o array em volta. O que não se faz é tentar adivinhar
- * uma lista dentro de um texto: `"preto, branco"` sai como veio, porque supor um
- * separador inventaria uma estrutura que a origem não declarou.
  */
 export function normalizarListaTexto(valor: unknown): string {
   if (!Array.isArray(valor)) return normalizarTexto(valor);
