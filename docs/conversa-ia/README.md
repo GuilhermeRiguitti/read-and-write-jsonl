@@ -11,6 +11,7 @@ ficam recolhidas em blocos que abrem no clique.
 | 09/08/2026, 17:05 | [Fase 2](fase-2.md) | filtro por campeonato | 3 | 33 |
 | 09/08/2026, 20:07 | [Revisão](revisao-cores.md) | `colors` fora do formato de lista | 1 | 20 |
 | 09/08/2026, 20:45 | [Fase 3](fase-3.md) | saída em CSV | 2 | 50 |
+| 10/08/2026, 09:55 | [Buffer do log](simplificar-buffer-log.md) | remover buffer customizado de 4 KiB no stderr | 1 | 3 |
 
 As três **fases** são onde o programa foi construído; as **revisões** são sessões
 de conferência abertas à parte. A fase 1 foi retomada ao longo de dois dias, então

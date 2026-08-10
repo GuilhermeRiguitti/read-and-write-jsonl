@@ -23,7 +23,7 @@ export type Escritor = {
  * O padrão de 64 KiB serve à saída de dados; quem escreve diagnóstico passa um
  * limite menor, para não deixar muito texto pendente em caso de interrupção.
  */
-export function criarEscritor(stream: Writable, limite: number = LIMITE_BUFFER_SAIDA): Escritor {
+export function criarEscritor(stream: Writable): Escritor {
   let partes: string[] = [];
   let tamanho = 0;
 
@@ -43,7 +43,7 @@ export function criarEscritor(stream: Writable, limite: number = LIMITE_BUFFER_S
     write(texto: string): void | Promise<void> {
       partes.push(texto);
       tamanho += texto.length;
-      if (tamanho >= limite) return flush();
+      if (tamanho >= LIMITE_BUFFER_SAIDA) return flush();
       return undefined;
     },
     flush,

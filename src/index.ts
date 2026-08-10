@@ -40,10 +40,7 @@ async function main(): Promise<void> {
 
   // Registros vão para os CSVs; diagnóstico (progresso, erros, resumo) para o
   // stderr, para que a saída em arquivo não se misture com o relatório.
-  //
-  // Buffer menor no diagnóstico: menos texto pendente a perder se o processo
-  // morrer, sem abrir mão do agrupamento das escritas.
-  const log = criarEscritor(process.stderr, 4 * 1024);
+  const log = criarEscritor(process.stderr);
 
   await log.write(`Lendo JSONL: ${caminho}\n`);
 
