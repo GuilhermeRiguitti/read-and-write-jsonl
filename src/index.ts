@@ -139,10 +139,6 @@ async function converter(
       contadores.ignorados += 1;
     } else {
       contadores.invalidos += 1;
-      await log.write(
-        `[linha ${resultado.linha}] ERRO: ${resultado.motivo}\n` +
-        `[linha ${resultado.linha}] conteúdo: ${resultado.trecho}\n`,
-      );
     }
 
     const processadas = contadores.lidos + contadores.ignorados + contadores.invalidos;
