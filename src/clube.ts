@@ -33,35 +33,21 @@ export function ehClubeElegivel(valor: unknown): boolean {
 /**
  * Valida e normaliza uma linha do JSONL de clubes.
  *
- * Duas coisas invalidam a linha inteira:
- *
- * 1. não ser um objeto JSON — não há registro nenhum para aproveitar;
- * 2. não ter `club_id` — o enunciado define `Id do Clube` como "chave que liga o
- *    jogador ao clube". Sem ela, os jogadores viram órfãos em `players.csv` (e
- *    indistinguíveis entre si, se mais de um clube vier sem id) e o clube entra
- *    em `clubs.csv` sem chave. É registro incompleto, e o enunciado manda deixar
- *    esses de fora do resultado.
- *
- * Todo o resto é normalizado: campo ausente, nulo ou fora do formato esperado
- * vira string vazia ou lista vazia, e a leitura segue. Formato torto de um campo
- * custa aquele campo, nunca o registro.
+ * Só invalida a linha inteira quando não é um objeto JSON — não há registro
+ * nenhum para aproveitar. Todo o resto é normalizado: campo ausente, nulo ou
+ * fora do formato esperado vira string vazia ou lista vazia, e a leitura segue.
+ * Isso inclui `club_id`: ausente ou nulo vira `""` no clube e é propagado para
+ * os jogadores, conforme a regra geral do enunciado para campos vazios.
  *
  * Lança em caso de linha inválida; quem chama (o leitor) já captura, reporta e
- * passa para a próxima linha. A mensagem não repete o número da linha: o leitor
- * é dono dessa contagem e já a prefixa no relatório.
+ * passa para a próxima linha.
  */
 export function validarClube(valor: unknown): ClubeNormalizado {
   if (!ehObjeto(valor)) {
     throw new Error("não é um objeto JSON");
   }
 
-  const clube = normalizarClube(valor);
-
-  if (clube.club_id === VAZIO) {
-    throw new Error("sem club_id: chave obrigatória para ligar clube e jogadores");
-  }
-
-  return clube;
+  return normalizarClube(valor);
 }
 
 /** Mapeia o registro bruto para os campos de saída, todos como texto. */

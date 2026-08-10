@@ -78,12 +78,18 @@ describe("validarClube", () => {
     assert.throws(() => validarClube(null), /não é um objeto JSON/);
   });
 
-  it("rejeita clube sem club_id, a chave que liga os dois arquivos", () => {
-    assert.throws(() => validarClube({ ...CLUBE, club_id: null }), /sem club_id/);
-    assert.throws(() => validarClube({ ...CLUBE, club_id: "  " }), /sem club_id/);
+  it("club_id ausente ou vazio vira campo vazio e propaga para os jogadores", () => {
+    const clube = validarClube({ ...CLUBE, club_id: null });
+
+    assert.equal(clube.club_id, "");
+    assert.equal(clube.players[0]?.club_id, "");
+    assert.equal(clube.name, "Sport Club Corinthians Paulista");
 
     const { club_id: _ignorado, ...semId } = CLUBE;
-    assert.throws(() => validarClube(semId), /sem club_id/);
+    const semIdNormalizado = validarClube(semId);
+
+    assert.equal(semIdNormalizado.club_id, "");
+    assert.equal(semIdNormalizado.players[0]?.club_id, "");
   });
 
   it("aceita jogador sem player_id: não é chave de ligação", () => {

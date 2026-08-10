@@ -61,10 +61,14 @@ montada a partir dos grupos capturados, **nunca** a partir de `Date`.
 
 ---
 
-## 2. `club_id` ausente invalida o registro
+## 2. `club_id` ausente vira campo vazio
 
-Sem `club_id`, jogadores ficariam órfãos em `players.csv`. Clube sem id é
-contado como erro e descartado. `player_id` ausente só vira campo vazio.
+O enunciado manda que campos ausentes ou nulos viram vazio no CSV — regra geral,
+sem exceção para `club_id`. Embora `Id do Clube` seja descrito como a chave que
+liga jogador e clube, sua ausência **não** invalida o registro: o clube entra em
+`clubs.csv` com id vazio e cada jogador herda `""` em `Id do Clube`.
+
+`player_id` ausente segue a mesma regra: só vira campo vazio.
 
 ---
 

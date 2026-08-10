@@ -83,9 +83,12 @@ digitação não apague o resultado da execução anterior.
   textos como `"Campeonato Brasileiro Série A"`).
 - **Cores:** lista unida por `|`; vazia ou ausente → campo vazio.
 - **Datas:** saída em `yyyy-MM-dd`; inválida → vazio.
-- **Campos ausentes/nulos:** viram campo vazio no CSV.
+- **Campos ausentes/nulos:** viram campo vazio no CSV — inclusive `club_id`,
+  propagado para `Id do Clube` de cada jogador (ver
+  [`docs/DECISOES.md`](docs/DECISOES.md#2-club_id-ausente-vira-campo-vazio)).
 - **CSV:** UTF-8, cabeçalho, vírgula, escaping RFC 4180 (`csv-stringify`).
-- **Robustez:** registro problemático é descartado; o processamento continua.
+- **Robustez:** linha com JSON inválido ou que não é objeto é descartada; o
+  processamento continua.
 
 Colunas e mapeamento JSON → CSV estão em [`docs/DECISOES.md`](docs/DECISOES.md).
 
