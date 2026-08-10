@@ -1,5 +1,9 @@
+import { createWriteStream } from "node:fs";
 import type { Writable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { stringify, type ColumnOption } from "csv-stringify";
 import { LIMITE_BUFFER_SAIDA } from "./constants.ts";
+import { mensagemDoErro } from "./helpers.ts";
 
 export type Escritor = {
   /**
@@ -40,6 +44,69 @@ export function criarEscritor(stream: Writable, limite: number = LIMITE_BUFFER_S
       return undefined;
     },
     flush,
+  };
+}
+
+export type EscritorCsv<T> = {
+  /**
+   * Enfileira um registro. Retorna uma Promise só quando o destino sinalizou que
+   * está cheio — quem chama deve dar `await` para respeitar a contrapressão.
+   */
+  write(registro: T): void | Promise<void>;
+  close(): Promise<void>;
+};
+
+/**
+ * Escreve registros em um CSV, um objeto por linha.
+ *
+ * A contrapressão é a mesma do `criarEscritor`, só que atravessando dois streams:
+ * quando o arquivo enche, o `pipeline` para de puxar do stringifier, o buffer
+ * dele fecha e o `write` daqui devolve a Promise que segura o laço de leitura no
+ * ritmo do disco.
+ */
+export function criarEscritorCsv<T>(
+  caminho: string,
+  colunas: ReadonlyArray<string | ColumnOption>,
+): EscritorCsv<T> {
+  // O padrão do `createWriteStream` é 16 KiB; subir para a mesma faixa do
+  // `criarEscritor` dá ao stream mais escritas em voo para reagrupar em um
+  // `_writev`, em vez de pagar uma syscall por registro — o stringifier emite um
+  // pedaço por registro. O lado legível dele acompanha, pelo mesmo motivo.
+  const arquivo = createWriteStream(caminho, { highWaterMark: LIMITE_BUFFER_SAIDA });
+  const csv = stringify({
+    header: true,
+    columns: colunas,
+    readableHighWaterMark: LIMITE_BUFFER_SAIDA,
+  });
+
+  // `pipeline` e não `pipe`: `pipe` engole o erro do arquivo (disco cheio, sem
+  // permissão) e o programa terminaria dizendo que escreveu o que não escreveu.
+  //
+  // A falha é guardada em vez de ficar como rejeição solta, porque ela pode
+  // acontecer no meio do laço, muito antes de alguém dar `await` na Promise: sem
+  // o `catch`, o processo morreria de unhandled rejection sem mensagem.
+  let falha: Error | undefined;
+  const terminado = pipeline(csv, arquivo).catch((cause: unknown) => {
+    falha = cause instanceof Error ? cause : new Error(mensagemDoErro(cause));
+  });
+
+  return {
+    write(registro: T): void | Promise<void> {
+      if (falha !== undefined) throw falha;
+      if (csv.write(registro)) return undefined;
+      return esperarDrain(csv);
+    },
+
+    /**
+     * Encerra o stringifier e espera o `pipeline` terminar. Só depois disso o
+     * conteúdo está de fato em disco — anunciar o resumo antes seria mentir
+     * sobre o que foi escrito.
+     */
+    async close(): Promise<void> {
+      csv.end();
+      await terminado;
+      if (falha !== undefined) throw falha;
+    },
   };
 }
 

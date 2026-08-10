@@ -10,6 +10,10 @@ dist/
 .env.*
 !.env.example
 
+# Saída gerada
+clubs.csv
+players.csv
+
 # Logs
 logs/
 *.log
