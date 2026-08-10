@@ -108,13 +108,6 @@ linha. Mesma regra para outros campos escalares.
 - Nada acumulado entre iterações; contrapressão de ponta a ponta.
 - `JSON.parse` e validação sob `try/catch` por linha.
 
-### Testes
-
-- **`helpers.test.ts`** — normalizações, datas, listas.
-- **`clube.test.ts`** — filtro, validação, mapeamento.
-- **`reader.test.ts`** — leitura incremental, CRLF, BOM, teto por linha.
-- **`e2e.test.ts`** — pipeline completo contra o sample versionado.
-
 ---
 
 ## Idioma do código

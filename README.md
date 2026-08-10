@@ -19,7 +19,7 @@ O processamento é incremental: o arquivo nunca é carregado inteiro na memória
 
 - **Node.js 20 ou superior**
 - Dependências: [`csv-stringify`](https://csv.js.org/stringify/) (runtime) e
-  TypeScript/`tsx` (desenvolvimento e testes)
+  TypeScript/`tsx` (desenvolvimento)
 
 ```bash
 npm install
@@ -67,31 +67,6 @@ digitação não apague o resultado da execução anterior.
 
 ---
 
-## Testes e verificação de tipos
-
-```bash
-npm test
-npm run typecheck
-```
-
-`npm test` compila `src/` para `dist/` e roda testes unitários + um E2E.
-
-O teste E2E compara a saída gerada a partir de `sample_clubes.jsonl` com
-`clubs.csv` e `players.csv` na **raiz do repositório**. Esses dois arquivos
-precisam existir antes de rodar os testes — são a referência esperada, não são
-produzidos automaticamente pelo `npm test`.
-
-Para gerá-los (ou atualizá-los após mudança de regra):
-
-```bash
-npm run build
-npm start -- sample_clubes.jsonl
-```
-
-Os testes unitários (`clube`, `helpers`, `reader`) **não** dependem desses CSVs.
-
----
-
 ## Regras de negócio (resumo)
 
 - **Filtro:** só clubes de Série A ou Série B (comparação normalizada; aceita
@@ -120,7 +95,6 @@ src/
   helpers.ts      normalizações puras
   constants.ts    colunas, limites, regex
   models/         tipos normalizados
-tests/            unitários + e2e
 docs/
   DECISOES.md     decisões de design
   conversa-ia/    histórico com IA
@@ -131,7 +105,7 @@ docs/
 ## Uso de IA
 
 Desenvolvido com apoio de assistente de IA. A ferramenta também foi usada neste
-README, nos comentários e na escrita dos testes. Sessões em
+README e nos comentários. Sessões em
 [`docs/conversa-ia/`](docs/conversa-ia/):
 
 | Quando | Sessão | Sobre |
