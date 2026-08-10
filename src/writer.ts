@@ -6,23 +6,10 @@ import { LIMITE_BUFFER_SAIDA } from "./constants.ts";
 import { mensagemDoErro } from "./helpers.ts";
 
 export type Escritor = {
-  /**
-   * Enfileira texto para saída. Retorna uma Promise só quando o buffer encheu —
-   * quem chama deve dar `await` para respeitar a contrapressão do destino.
-   */
   write(texto: string): void | Promise<void>;
   flush(): Promise<void>;
 };
 
-/**
- * Aqui o texto é agrupado até o `limite` informado (menos syscalls, mais vazão)
- * e, quando o destino sinaliza que está cheio, a escrita espera o `drain` antes
- * de continuar. Isso também segura o laço de leitura: o arquivo só avança no
- * ritmo em que a saída é consumida.
- *
- * O padrão de 64 KiB serve à saída de dados; quem escreve diagnóstico passa um
- * limite menor, para não deixar muito texto pendente em caso de interrupção.
- */
 export function criarEscritor(stream: Writable): Escritor {
   let partes: string[] = [];
   let tamanho = 0;
@@ -51,21 +38,10 @@ export function criarEscritor(stream: Writable): Escritor {
 }
 
 export type EscritorCsv<T> = {
-  /**
-   * Enfileira um registro. Retorna uma Promise só quando o destino sinalizou que
-   * está cheio — quem chama deve dar `await` para respeitar a contrapressão.
-   */
   write(registro: T): void | Promise<void>;
   close(): Promise<void>;
 };
 
-/**
- * Escreve registros em um CSV, um objeto por linha.
- *
- * Quando o arquivo enche, o `pipeline` para de puxar do stringifier, o buffer
- * dele fecha e o `write` daqui devolve a Promise que segura o laço de leitura no
- * ritmo do disco.
- */
 export function criarEscritorCsv<T>(
   caminho: string,
   colunas: ReadonlyArray<string | ColumnOption>,
@@ -77,9 +53,7 @@ export function criarEscritorCsv<T>(
     readableHighWaterMark: LIMITE_BUFFER_SAIDA,
   });
 
-  // A falha é guardada em vez de ficar como rejeição solta, porque ela pode
-  // acontecer no meio do laço, muito antes de alguém dar `await` na Promise: sem
-  // o `catch`, o processo morreria de unhandled rejection sem mensagem.
+  // Guarda falha do pipeline para não virar unhandled rejection no meio do laço.
   let falha: Error | undefined;
   const terminado = pipeline(csv, arquivo).catch((cause: unknown) => {
     falha = cause instanceof Error ? cause : new Error(mensagemDoErro(cause));
@@ -92,9 +66,6 @@ export function criarEscritorCsv<T>(
       return esperarDrain(csv);
     },
 
-    /**
-     * Encerra o stringifier e espera o `pipeline` terminar.
-     */
     async close(): Promise<void> {
       csv.end();
       await terminado;
@@ -103,14 +74,6 @@ export function criarEscritorCsv<T>(
   };
 }
 
-/**
- * Espera o destino liberar espaço, mas sem ficar preso para sempre: se o stream
- * fechar ou falhar antes do `drain`, rejeita para o erro subir e a execução
- * terminar com mensagem — em vez de a leitura travar em silêncio.
- *
- * Os listeners são removidos em qualquer um dos desfechos: com milhões de
- * registros, deixar listener pendurado a cada bloco vazaria memória.
- */
 function esperarDrain(stream: Writable): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const limpar = (): void => {

@@ -104,8 +104,7 @@ docs/
 
 ## Uso de IA
 
-Desenvolvido com apoio de assistente de IA. A ferramenta também foi usada neste
-README e nos comentários. Sessões em
+Desenvolvido com apoio de assistente de IA. Sessões em
 [`docs/conversa-ia/`](docs/conversa-ia/):
 
 | Quando | Sessão | Sobre |

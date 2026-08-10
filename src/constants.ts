@@ -1,51 +1,24 @@
-/** Bloco lido do disco por vez. */
 export const TAMANHO_BLOCO_LEITURA = 256 * 1024;
 
-/**
- * Teto de caracteres para uma única linha. Uma linha maior que isso é descartada
- * e contada como erro, em vez de crescer na memória sem limite (arquivo
- * corrompido, sem quebras de linha).
- */
+/** Linha acima disso é descartada — protege contra JSONL sem quebras de linha. */
 export const LIMITE_TAMANHO_LINHA = 8 * 1024 * 1024;
 
-/** De quantos em quantos registros o progresso é reportado no stderr. */
 export const INTERVALO_PROGRESSO = 100_000;
-
-/** Valor de saída para campo ausente, nulo ou que falhou na validação. */
 export const VAZIO = "";
-
-/** Junta listas de escalares (ex.: cores) em um único campo de texto. */
 export const SEPARADOR_LISTA = "|";
 
-/**
- * Padrões de campeonato aceito, aplicados sobre o texto já normalizado por
- * `chaveDeTexto` (caixa alta, sem acento). `\b` evita casar "SERIE A" dentro de
- * outra palavra, mas aceita prefixos como "CAMPEONATO BRASILEIRO SERIE A".
- */
+/** Aplicado sobre texto normalizado por `chaveDeTexto`; `\b` evita falso positivo em "SERIE AUXILIAR". */
 export const PADROES_CAMPEONATO_ACEITO = [/\bSERIE A\b/, /\bSERIE B\b/] as const;
 
-/**
- * Formatos de data aceitos na entrada: `YYYY-MM-DD` e a mesma data seguida de
- * um horário UTC (`YYYY-MM-DDTHH:MM:SSZ`, com frações de segundo opcionais). O
- * horário é aceito e descartado — só a parte da data vai para a saída.
- */
+/** Aceita `YYYY-MM-DD` ou a mesma data com horário UTC opcional — só a data vai para a saída. */
 export const PADRAO_DATA = /^(\d{4})-(\d{2})-(\d{2})(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)?$/;
 
-/** Quanto texto o escritor acumula antes de mandar para o stream. */
 export const LIMITE_BUFFER_SAIDA = 64 * 1024;
 
 export const ARQUIVO_CLUBES = "clubs.csv";
 export const ARQUIVO_JOGADORES = "players.csv";
 
-/**
- * Colunas no formato que o `csv-stringify` recebe na opção `columns`.
- *
- * Declarar aqui resolve três coisas num lugar só: a ordem das colunas, o nome do
- * cabeçalho (em português, diferente da chave do JSON) e o recorte dos campos —
- * chave não listada é descartada pela própria biblioteca, então `players` não
- * vira coluna e o `ClubeNormalizado` pode ser escrito como está, sem etapa de
- * mapeamento a cada registro.
- */
+/** `{ key, header }` define ordem, cabeçalho em português e recorte de campos num só lugar. */
 export const COLUNAS_CLUBES = [
   { key: "club_id", header: "Id do Clube" },
   { key: "name", header: "Nome" },

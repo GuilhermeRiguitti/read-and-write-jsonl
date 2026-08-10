@@ -13,14 +13,6 @@ import { mensagemDoErro } from "./helpers.ts";
 import type { ClubeNormalizado } from "./models/clube.ts";
 import type { JogadorNormalizado } from "./models/jogador.ts";
 
-/**
- * O que a execução produziu, para o relatório final.
- *
- * `clubesEscritos` conta o que chegou ao CSV, não o que foi lido: as linhas
- * recusadas pelo filtro e as inválidas entram nos outros dois contadores. A
- * soma dos três equivale ao total de linhas não vazias do arquivo (linhas em
- * branco são puladas e não entram em nenhum contador).
- */
 type Contadores = {
   clubesEscritos: number;
   ignorados: number;
@@ -37,9 +29,6 @@ type Destinos = {
 
 async function main(): Promise<void> {
   const caminho = process.argv[2]?.trim();
-
-  // Registros vão para os CSVs; diagnóstico (progresso, erros, resumo) para o
-  // stderr, para que a saída em arquivo não se misture com o relatório.
   const log = criarEscritor(process.stderr);
 
   if (caminho === undefined || caminho === "") {
@@ -51,10 +40,7 @@ async function main(): Promise<void> {
 
   await log.write(`Lendo JSONL: ${caminho}\n`);
 
-  // A entrada é conferida ANTES de abrir os CSVs porque `createWriteStream`
-  // trunca o arquivo já na abertura: um caminho errado na linha de comando
-  // apagaria o resultado da execução anterior e deixaria dois arquivos só com
-  // cabeçalho no lugar dele.
+  // createWriteStream trunca na abertura — conferir a entrada antes evita apagar CSVs válidos.
   try {
     await conferirEntrada(caminho);
   } catch (cause) {
@@ -78,17 +64,12 @@ async function main(): Promise<void> {
   const falhasAoFechar: string[] = [];
   const inicio = performance.now();
 
-  // A leitura em si pode falhar fora do JSON.parse: arquivo inexistente, sem
-  // permissão, erro de disco, saída fechada no meio. Nesses casos o laço é
-  // interrompido com mensagem clara e o resumo parcial ainda é impresso.
   try {
     await converter(caminho, { clubes, jogadores, log }, contadores);
   } catch (cause) {
     falha = mensagemDoErro(cause);
     process.exitCode = 1;
   } finally {
-    // Fecha os dois mesmo depois de uma falha na leitura: assim os arquivos
-    // ficam fechados e válidos até onde a leitura chegou.
     const resultados = await Promise.all([
       fechar(ARQUIVO_CLUBES, clubes),
       fechar(ARQUIVO_JOGADORES, jogadores),
@@ -108,25 +89,11 @@ async function main(): Promise<void> {
   });
 }
 
-/**
- * Confere que o caminho recebido dá para ler antes de qualquer escrita.
- *
- * Não substitui o `try/catch` da leitura — o arquivo pode sumir ou falhar depois
- * daqui —, mas cobre o caso comum (caminho errado, pasta no lugar do arquivo)
- * enquanto ainda dá para desistir sem tocar na saída anterior.
- */
 async function conferirEntrada(caminho: string): Promise<void> {
   const info = await stat(caminho);
   if (!info.isFile()) throw new Error(`${caminho} não é um arquivo`);
 }
 
-/**
- * Laço central: uma passada pelo arquivo, escrevendo os dois CSVs.
- *
- * Cada clube é lido, escrito e sai de escopo na mesma iteração, junto com seus
- * jogadores — não há acúmulo entre iterações nem segunda passada pelo arquivo, e
- * o `await` das escritas é o que segura a leitura no ritmo do disco.
- */
 async function converter(
   caminho: string,
   { clubes, jogadores, log }: Destinos,
@@ -144,13 +111,8 @@ async function converter(
         contadores.jogadoresEscritos += 1;
       }
     } else if (resultado.ignorada) {
-      // Clube de outro campeonato não é erro: entra num contador separado, para
-      // não se misturar com dado corrompido no resumo.
       contadores.ignorados += 1;
     } else {
-      // Nem a linha inválida nem a recusada pelo filtro vão para o stderr: numa
-      // base grande as duas seriam muitas, e o relatório linha a linha afogaria
-      // o console. As duas aparecem contadas no resumo do fim da execução.
       contadores.invalidos += 1;
     }
 
@@ -159,9 +121,6 @@ async function converter(
       const rss = process.memoryUsage().rss;
       contadores.picoRss = Math.max(contadores.picoRss, rss);
       await log.write(`... ${processadas} linhas processadas (rss ${mb(rss)} MB)\n`);
-      // Progresso só serve se aparecer durante a execução. Sem este flush ele
-      // ficaria retido no buffer do log até o fim — numa base grande, seriam
-      // minutos sem sinal nenhum de que o programa avança.
       await log.flush();
     }
   }
@@ -181,8 +140,6 @@ async function relatar(log: Escritor, relatorio: Relatorio): Promise<void> {
     await log.write(`\nLeitura interrompida: ${falha}\n`);
   }
 
-  // Depois do erro de leitura, nunca no lugar dele: fechar um arquivo já
-  // interrompido costuma falhar por consequência, e a causa é a de cima.
   for (const problema of falhasAoFechar) {
     await log.write(`${problema}\n`);
   }
@@ -198,11 +155,6 @@ async function relatar(log: Escritor, relatorio: Relatorio): Promise<void> {
   await log.flush();
 }
 
-/**
- * Fecha um escritor devolvendo a falha como texto em vez de lançar: o
- * fechamento roda em `finally`, e uma exceção aqui substituiria o erro de
- * leitura que trouxe o programa até este ponto.
- */
 async function fechar(nome: string, escritor: Pick<EscritorCsv<never>, "close">): Promise<string> {
   try {
     await escritor.close();
@@ -219,8 +171,6 @@ function mb(bytes: number): string {
 try {
   await main();
 } catch (cause) {
-  // Rede de segurança: nada deve chegar aqui, mas se chegar sai com mensagem
-  // legível em vez de stack trace de promise rejeitada.
   process.stderr.write(`Erro inesperado: ${mensagemDoErro(cause)}\n`);
   process.exitCode = 1;
 }

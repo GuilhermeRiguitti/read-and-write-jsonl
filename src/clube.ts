@@ -9,12 +9,7 @@ import {
 } from "./helpers.ts";
 import { PADROES_CAMPEONATO_ACEITO, VAZIO } from "./constants.ts";
 
-/**
- * Decide se o registro bruto interessa, antes de qualquer validação ou
- * normalização: só clubes de Série A ou Série B seguem adiante.
- */
 export function ehClubeElegivel(valor: unknown): boolean {
-
   if (!ehObjeto(valor)) return true;
 
   const campeonato = chaveDeTexto(valor.championship);
@@ -23,13 +18,7 @@ export function ehClubeElegivel(valor: unknown): boolean {
   return PADROES_CAMPEONATO_ACEITO.some((padrao) => padrao.test(campeonato));
 }
 
-/**
- * Valida e normaliza uma linha do JSONL de clubes.
- *
- * Só invalida a linha inteira quando não é um objeto JSON — não há registro
- * nenhum para aproveitar. Todo o resto é normalizado: campo ausente, nulo ou
- * fora do formato esperado vira string vazia ou lista vazia, e a leitura segue.
- */
+/** Só invalida a linha quando não é objeto JSON; demais campos inválidos viram vazio. */
 export function validarClube(valor: unknown): ClubeNormalizado {
   if (!ehObjeto(valor)) {
     throw new Error("não é um objeto JSON");
@@ -38,7 +27,6 @@ export function validarClube(valor: unknown): ClubeNormalizado {
   return normalizarClube(valor);
 }
 
-/** Mapeia o registro bruto para os campos de saída, todos como texto. */
 function normalizarClube(bruto: Record<string, unknown>): ClubeNormalizado {
   const club_id = normalizarTexto(bruto.club_id);
 
@@ -58,21 +46,13 @@ function normalizarClube(bruto: Record<string, unknown>): ClubeNormalizado {
   };
 }
 
-/**
- * A lista de jogadores do registro bruto, sem os itens inaproveitáveis.
- *
- * `players` fora do formato de lista vira elenco vazio: o clube continua em
- * `clubs.csv`, só não gera linha em `players.csv` — mesmo tratamento de um clube
- * que legitimamente não tem jogadores. Item que não é objeto sai da lista, em
- * vez de virar uma linha com todos os campos vazios.
- */
+/** `players` inválido ou item não-objeto não derruba o clube — só reduz o elenco. */
 function normalizarJogadores(bruto: unknown, club_id: string): JogadorNormalizado[] {
   if (!Array.isArray(bruto)) return [];
 
   return bruto.filter(ehObjeto).map((jogador) => normalizarJogador(jogador, club_id));
 }
 
-/** O jogador não carrega o clube no JSONL: o id vem do registro pai. */
 function normalizarJogador(bruto: Record<string, unknown>, club_id: string): JogadorNormalizado {
   return {
     club_id,
