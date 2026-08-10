@@ -1,6 +1,6 @@
 # Histórico da conversa — fase 3
 
-Continuação de [fase-2-todo.md](fase-2-todo.md). Registro da sessão de
+Continuação de [fase-2.md](fase-2.md). Registro da sessão de
 desenvolvimento deste projeto (Claude Code, 09/08/2026), com as solicitações
 feitas e as respostas dadas, na ordem em que aconteceram.
 
@@ -343,5 +343,5 @@ se o `club_id` serve de chave de junção entre os dois CSVs, vale revisitar.
 
 ### Resposta
 
-Este arquivo, no mesmo formato de [fase-1-todo.md](fase-1-todo.md) e
-[fase-2-todo.md](fase-2-todo.md).
+Este arquivo, no mesmo formato de [fase-1.md](fase-1.md) e
+[fase-2.md](fase-2.md).

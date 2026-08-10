@@ -1,6 +1,6 @@
 # Histórico da conversa — fase 2
 
-Continuação de [fase-1-todo.md](fase-1-todo.md). Registro da sessão de
+Continuação de [fase-1.md](fase-1.md). Registro da sessão de
 desenvolvimento deste projeto (Claude Code, 09/08/2026), com as solicitações
 feitas e as respostas dadas, na ordem em que aconteceram.
 

@@ -5,46 +5,21 @@ node_modules/
 dist/
 *.tsbuildinfo
 
-# Variáveis de ambiente
-.env
-.env.*
-!.env.example
-
-# Saída gerada
-clubs.csv
-players.csv
-
 # Logs
-logs/
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Cache de ferramentas
-.cache/
-.npm/
-.eslintcache
-coverage/
-.nyc_output/
 
 # Editores / IDEs
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
+.vscode/
 .idea/
 *.swp
 
 # Sistema operacional
 Thumbs.db
-ehthumbs.db
-Desktop.ini
 .DS_Store
 
-# Arquivos temporários do Excel (xlsx)
-~$*.xlsx
-~$*.xls
-
-#TODO
+# Anotações locais
 TODO.md
+
+# Nota: clubs.csv e players.csv NÃO são ignorados — o enunciado pede que os dois
+# arquivos gerados a partir do sample_clubes.jsonl sejam entregues junto do código.

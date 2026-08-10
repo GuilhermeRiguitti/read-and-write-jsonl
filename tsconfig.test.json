@@ -1,0 +1,11 @@
+{
+  // Mesmas regras do projeto, mas cobrindo também a pasta `tests/`. Só verifica
+  // tipos — quem gera `dist/` é o tsconfig.json, que continua com `rootDir` em
+  // `src` para não arrastar os testes para o build.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

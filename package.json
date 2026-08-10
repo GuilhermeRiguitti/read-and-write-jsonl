@@ -1,17 +1,17 @@
 {
   "name": "teste-tecnico",
   "version": "1.0.0",
-  "description": "",
+  "description": "Converte um JSONL de clubes de futebol em clubs.csv e players.csv, com leitura incremental para bases grandes.",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "dev": "node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "test": "node --test",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["jsonl", "csv", "etl", "batch"],
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^26.2.0",
