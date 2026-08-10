@@ -1,6 +1,3 @@
-/** Entrada usada quando o programa é chamado sem caminho. */
-export const ARQUIVO_ENTRADA_PADRAO = "sample_clubes.jsonl";
-
 /** Bloco lido do disco por vez. */
 export const TAMANHO_BLOCO_LEITURA = 256 * 1024;
 
@@ -21,10 +18,11 @@ export const VAZIO = "";
 export const SEPARADOR_LISTA = "|";
 
 /**
- * Só clubes destes campeonatos entram na leitura. Os valores ficam na forma
- * comparável produzida por `chaveDeTexto` (caixa alta, sem acento).
+ * Padrões de campeonato aceito, aplicados sobre o texto já normalizado por
+ * `chaveDeTexto` (caixa alta, sem acento). `\b` evita casar "SERIE A" dentro de
+ * outra palavra, mas aceita prefixos como "CAMPEONATO BRASILEIRO SERIE A".
  */
-export const CAMPEONATOS_ACEITOS = new Set(["SERIE A", "SERIE B"]);
+export const PADROES_CAMPEONATO_ACEITO = [/\bSERIE A\b/, /\bSERIE B\b/] as const;
 
 /**
  * Formatos de data aceitos na entrada: `YYYY-MM-DD` e a mesma data seguida de

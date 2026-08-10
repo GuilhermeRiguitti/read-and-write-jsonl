@@ -4,7 +4,6 @@ import { criarEscritor, criarEscritorCsv, type Escritor, type EscritorCsv } from
 import { ehClubeElegivel, validarClube } from "./clube.ts";
 import {
   ARQUIVO_CLUBES,
-  ARQUIVO_ENTRADA_PADRAO,
   ARQUIVO_JOGADORES,
   COLUNAS_CLUBES,
   COLUNAS_JOGADORES,
@@ -18,8 +17,9 @@ import type { JogadorNormalizado } from "./models/jogador.ts";
  * O que a execução produziu, para o relatório final.
  *
  * `clubesEscritos` conta o que chegou ao CSV, não o que foi lido: as linhas
- * recusadas pelo filtro e as inválidas entram nos outros dois contadores, e a
- * soma dos três é o total de linhas do arquivo.
+ * recusadas pelo filtro e as inválidas entram nos outros dois contadores. A
+ * soma dos três equivale ao total de linhas não vazias do arquivo (linhas em
+ * branco são puladas e não entram em nenhum contador).
  */
 type Contadores = {
   clubesEscritos: number;
@@ -36,11 +36,18 @@ type Destinos = {
 };
 
 async function main(): Promise<void> {
-  const caminho = process.argv[2] ?? ARQUIVO_ENTRADA_PADRAO;
+  const caminho = process.argv[2]?.trim();
 
   // Registros vão para os CSVs; diagnóstico (progresso, erros, resumo) para o
   // stderr, para que a saída em arquivo não se misture com o relatório.
   const log = criarEscritor(process.stderr);
+
+  if (caminho === undefined || caminho === "") {
+    await log.write("Uso: node dist/index.js <caminho-do-arquivo.jsonl>\n");
+    await log.flush();
+    process.exitCode = 1;
+    return;
+  }
 
   await log.write(`Lendo JSONL: ${caminho}\n`);
 

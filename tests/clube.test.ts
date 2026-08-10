@@ -28,6 +28,12 @@ describe("ehClubeElegivel", () => {
   it("recusa outros campeonatos", () => {
     assert.equal(ehClubeElegivel({ championship: "SERIE C" }), false);
     assert.equal(ehClubeElegivel({ championship: "SEM CAMPEONATO" }), false);
+    assert.equal(ehClubeElegivel({ championship: "SERIE AUXILIAR" }), false);
+  });
+
+  it("aceita campeonato com prefixo ou sufixo além de Série A/B", () => {
+    assert.equal(ehClubeElegivel({ championship: "Campeonato Brasileiro Série A" }), true);
+    assert.equal(ehClubeElegivel({ championship: "BRASILEIRÃO SÉRIE B" }), true);
   });
 
   it("recusa campeonato ausente, nulo ou vazio", () => {

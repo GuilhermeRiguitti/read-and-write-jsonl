@@ -7,7 +7,7 @@ import {
   normalizarListaTexto,
   normalizarTexto,
 } from "./helpers.ts";
-import { CAMPEONATOS_ACEITOS, VAZIO } from "./constants.ts";
+import { PADROES_CAMPEONATO_ACEITO, VAZIO } from "./constants.ts";
 
 /**
  * Decide se o registro bruto interessa, antes de qualquer validação ou
@@ -27,7 +27,7 @@ export function ehClubeElegivel(valor: unknown): boolean {
   const campeonato = chaveDeTexto(valor.championship);
   if (campeonato === VAZIO) return false;
 
-  return CAMPEONATOS_ACEITOS.has(campeonato);
+  return PADROES_CAMPEONATO_ACEITO.some((padrao) => padrao.test(campeonato));
 }
 
 /**
