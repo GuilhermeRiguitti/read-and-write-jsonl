@@ -1,4 +1,4 @@
-import { PADRAO_DATA, SEPARADOR_LISTA, SEPARADORES_ENTRADA, VAZIO } from "./constants.ts";
+import { PADRAO_DATA, SEPARADOR_LISTA, VAZIO } from "./constants.ts";
 
 /**
  * Funções pequenas e sem dependência de domínio, usadas por mais de um módulo.
@@ -106,42 +106,22 @@ function existeNoCalendario(ano: number, mes: number, dia: number): boolean {
 }
 
 /**
- * Coleção de registros vinda do JSON, tolerante ao formato.
- *
- * Lista virar ela mesma; um objeto solto virar lista de um (registro único
- * escrito fora da lista); qualquer outra coisa — ausente, nula, escalar — virar
- * lista vazia. Formato inesperado não invalida a linha: quem não tem os dados é
- * o campo, não o registro inteiro.
- */
-export function normalizarLista(valor: unknown): unknown[] {
-  if (Array.isArray(valor)) return valor;
-  if (ehObjeto(valor)) return [valor];
-
-  return [];
-}
-
-/**
  * Lista de escalares virar texto único ("preto|branco").
  *
- * O campo nem sempre chega como lista: pode vir string vazia, um valor só
- * (`"preto"`) ou vários já colados num texto (`"preto, branco"`). Todos são
- * aceitos, porque descartar a linha por causa da forma do campo perderia dados
- * que estão ali. Só o que não tem representação escalar (objeto, lista aninhada)
- * é que some, item a item.
+ * Itens sem representação escalar (objeto, lista aninhada) saem da lista, em vez
+ * de virarem `[object Object]` no meio do campo.
+ *
+ * Um valor escalar solto, fora de lista (`"preto"`), é aproveitado como está —
+ * é o mesmo dado, só sem o array em volta. O que não se faz é tentar adivinhar
+ * uma lista dentro de um texto: `"preto, branco"` sai como veio, porque supor um
+ * separador inventaria uma estrutura que a origem não declarou.
  */
 export function normalizarListaTexto(valor: unknown): string {
-  const itens = Array.isArray(valor) ? valor : [valor];
+  if (!Array.isArray(valor)) return normalizarTexto(valor);
 
-  return itens.flatMap((item) => separarTexto(normalizarTexto(item))).join(SEPARADOR_LISTA);
-}
-
-/** Um texto só pode trazer vários valores ("preto, branco"): vira lista. */
-function separarTexto(texto: string): string[] {
-  if (texto === VAZIO) return [];
-
-  return texto
-    .split(SEPARADORES_ENTRADA)
-    .map((parte) => parte.trim())
-    .filter((parte) => parte !== VAZIO);
+  return valor
+    .map((item) => normalizarTexto(item))
+    .filter((item) => item !== VAZIO)
+    .join(SEPARADOR_LISTA);
 }
 
