@@ -12,6 +12,10 @@ O processamento é incremental: o arquivo nunca é carregado inteiro na memória
 que permite rodar sobre bases de muitos milhões de registros com consumo de RAM
 constante.
 
+> **Composição do repositório.** O programa são ~1.000 linhas em `src/` e ~400 de
+> teste. As outras ~7.400 linhas estão em [`docs/conversa-ia/`](docs/conversa-ia/):
+> é o transcrito das sessões com IA, que o enunciado pede junto da entrega.
+
 ---
 
 ## Requisitos
@@ -32,13 +36,8 @@ O **caminho do arquivo de entrada é o primeiro parâmetro** do programa:
 node src/index.ts <caminho-do-arquivo.jsonl>
 ```
 
-Exemplos:
-
 ```bash
 node src/index.ts sample_clubes.jsonl
-```
-
-```bash
 node src/index.ts /dados/base_completa.jsonl
 ```
 
@@ -67,26 +66,22 @@ npm run typecheck
 ### Saída
 
 Os arquivos `clubs.csv` e `players.csv` são gravados **no diretório de trabalho
-atual** e sobrescrevem versões anteriores.
-
-O diagnóstico (progresso, erros por linha, resumo) vai para o **stderr**, separado
-dos dados. Ao final:
+atual** e sobrescrevem versões anteriores. O diagnóstico (progresso e resumo) vai
+para o **stderr**, separado dos dados:
 
 ```
-Resumo: 5 clube(s) lido(s), 1 ignorado(s) por campeonato, 0 linha(s) com erro.
+Resumo: 5 clube(s) gravado(s), 1 ignorado(s) por campeonato, 0 linha(s) com erro.
 Gerados: clubs.csv (5 linha(s)), players.csv (8 linha(s)).
 Tempo: 0.02s | pico de memória (rss): 70.1 MB
 ```
 
 Código de saída `1` em caso de falha na leitura ou na escrita; `0` caso contrário.
-Linhas inválidas **não** alteram o código de saída — são reportadas e o
+Linhas inválidas **não** alteram o código de saída — são contadas e o
 processamento segue.
 
-O caminho de entrada é conferido **antes** de os CSVs serem abertos: caminho
-inexistente ou pasta no lugar do arquivo encerram com código `1` sem tocar nos
-arquivos da execução anterior (`createWriteStream` trunca o destino já na
-abertura, então abrir primeiro apagaria um resultado bom por causa de um erro de
-digitação).
+O caminho de entrada é conferido **antes** de os CSVs serem abertos:
+`createWriteStream` trunca o destino já na abertura, então abrir primeiro faria um
+erro de digitação apagar o resultado da execução anterior.
 
 ---
 
@@ -126,48 +121,32 @@ Os nomes das colunas são em português e diferem das chaves do JSON.
 Campos presentes no JSON e não listados acima (`titles`, `nationality`,
 `market_value`) são descartados.
 
-### Formato
-
-UTF-8, sem BOM, com linha de cabeçalho, separado por vírgula e fim de registro
-`\n`. Campos com vírgula, aspas ou quebra de linha são escapados conforme a
-RFC 4180 (campo entre aspas duplas, aspas internas duplicadas) — comportamento
+**Formato.** UTF-8, sem BOM, com linha de cabeçalho, separado por vírgula e fim de
+registro `\n`. Campos com vírgula, aspas ou quebra de linha são escapados conforme
+a RFC 4180 (campo entre aspas duplas, aspas internas duplicadas) — comportamento
 padrão do `csv-stringify`.
 
 ---
 
 ## Regras de negócio
 
-### Filtro por campeonato
+**Filtro por campeonato.** Só entram clubes de Série A ou Série B; os demais não
+aparecem em nenhum dos dois arquivos, nem seus jogadores. A comparação usa uma
+forma normalizada do texto (caixa alta, sem acento, espaços colapsados), então
+`"SERIE A"`, `"Série A"` e `" série  a "` são o mesmo campeonato — o valor gravado
+no CSV é o original. Campeonato ausente, nulo ou vazio → clube ignorado: sem o
+campo não há como afirmar que é A ou B.
 
-Só entram clubes de **Série A** ou **Série B**. Clube de outro campeonato não
-aparece em nenhum dos dois arquivos, nem seus jogadores.
+**Ligação 1:N.** Cada linha de `players.csv` carrega o `club_id` do clube. Clube
+sem jogadores não gera linha em `players.csv`, mas continua em `clubs.csv`.
 
-A comparação é feita sobre uma forma normalizada do texto (caixa alta, sem
-acento, espaços colapsados), então `"SERIE A"`, `"Série A"` e `" série  a "` são
-tratados como o mesmo campeonato. O valor gravado no CSV é o original, sem
-normalização.
+**Cores.** A lista é unida em um único campo separado por `|` (`preto|branco`).
+Lista vazia ou ausente → campo vazio.
 
-Campeonato ausente, nulo ou vazio → clube ignorado: sem o campo não há como
-afirmar que é A ou B, e supor produziria informação errada na saída.
-
-### Ligação 1:N
-
-Cada linha de `players.csv` carrega o `club_id` do clube a que o jogador pertence.
-Clube sem jogadores não gera nenhuma linha em `players.csv`, mas continua
-aparecendo em `clubs.csv`.
-
-### Campos vazios
-
-Campo ausente ou nulo no JSON vira campo vazio no CSV. Também viram vazio:
-
-- números não finitos (`NaN`, `Infinity`);
-- valores compostos (objeto ou lista) onde se espera um escalar — converter
-  produziria lixo como `[object Object]` no arquivo final.
-
-### Cores
-
-A lista é unida em um único campo separado por `|` (ex.: `preto|branco`). Lista
-vazia ou ausente → campo vazio.
+**Campos vazios.** Campo ausente ou nulo no JSON vira campo vazio no CSV. Também
+viram vazio os números não finitos (`NaN`, `Infinity`) e os valores compostos
+(objeto ou lista) onde se espera um escalar — converter produziria lixo como
+`[object Object]` no arquivo final.
 
 ---
 
@@ -181,35 +160,24 @@ Pontos em que o enunciado deixava margem, e o critério usado em cada um.
 | --- | --- |
 | `1910-09-01` | `1910-09-01` |
 | `1910-09-01T14:30:00Z` | `1910-09-01` |
-| `1910-09-01T14:30:00.123Z` | `1910-09-01` |
 | qualquer outro formato | *(vazio)* |
 
 O enunciado define a origem em `yyyy-MM-dd`. A tolerância a um horário **UTC**
-(sufixo `Z`) foi acrescentada porque não introduz ambiguidade nenhuma: o dia está
-explícito e não há fuso a converter. Descartar `1910-09-01T00:00:00Z` perderia um
-dado inequívoco.
+(sufixo `Z`) foi acrescentada porque não introduz ambiguidade: o dia está
+explícito e não há fuso a converter.
 
 **Formatos ambíguos são rejeitados de propósito.** `03/04/2024` é 3 de abril em
 `dd/MM/yyyy` e 4 de março em `MM/dd/yyyy`; sem conhecer a origem do dado, escolher
-um dos dois grava uma data **plausível e errada**, que não aparece em log nenhum.
-Como a ambiguidade some nos dias acima de 12, o erro atingiria apenas parte dos
-registros e passaria despercebido em teste rápido. Campo vazio é uma perda
-visível e prevista pelo enunciado; data trocada é corrupção silenciosa.
+um dos dois grava uma data **plausível e errada**. Como a ambiguidade some nos
+dias acima de 12, o erro atingiria só parte dos registros e passaria despercebido.
+Campo vazio é uma perda visível e prevista pelo enunciado; data trocada é
+corrupção silenciosa. Datas com offset explícito (`-03:00`) ficam de fora pelo
+mesmo motivo: o mesmo instante cai em dias diferentes conforme o fuso.
 
-Datas com offset explícito (`-03:00`) também ficam de fora: o mesmo instante cai
-em dias diferentes conforme o fuso adotado, então não há resposta única para
-"qual é a data".
-
-**Validação em duas etapas** (`normalizarData`, em `src/helpers.ts`):
-
-1. **formato** — regex (`PADRAO_DATA`, em `src/constants.ts`);
-2. **calendário** — `2024-02-30` e `2023-02-29` casam com a regex mas não
-   existem. A checagem monta a data em UTC e confere se ano/mês/dia voltam
-   iguais; se o dia estourou o limite do mês, o `Date` desloca e a comparação
-   falha.
-
-A saída é montada a partir dos grupos capturados pela regex, **nunca a partir do
-`Date`** — formatar pelo `Date` reintroduziria fuso, e um `toISOString()` pode
+A validação (`normalizarData`, em `src/helpers.ts`) tem duas etapas — formato pela
+regex e existência no calendário, porque `2024-02-30` casa com a regex e não
+existe. A saída é montada a partir dos grupos capturados, **nunca a partir do
+`Date`**: formatar pelo `Date` reintroduziria fuso e um `toISOString()` pode
 devolver o dia anterior.
 
 ### 2. `club_id` ausente invalida o registro
@@ -219,34 +187,38 @@ ao clube"*. Um clube sem `club_id` produziria jogadores órfãos — e, se mais 
 clube viesse sem id, órfãos indistinguíveis entre si no mesmo arquivo. É registro
 incompleto, e a regra de robustez manda deixar esses de fora.
 
-Portanto: clube sem `club_id` é reportado como erro e descartado, junto com seus
-jogadores. `player_id` ausente **não** invalida nada — não é chave de ligação, só
-vira campo vazio.
+Clube sem `club_id` é contado como erro e descartado, junto com seus jogadores.
+`player_id` ausente **não** invalida nada: não é chave de ligação, só vira campo
+vazio.
 
 ### 3. Linha malformada é erro, não "ignorado"
 
-Linha que não é objeto JSON é contada e reportada como **erro**, não como
-"ignorado por campeonato". São situações diferentes: uma é dado corrompido, a
-outra é o filtro de negócio funcionando, e misturar as duas no mesmo contador
-esconderia problemas na base de origem.
+Linha que não é objeto JSON é contada como **erro**, não como "ignorado por
+campeonato". Uma é dado corrompido, a outra é o filtro de negócio funcionando;
+misturar as duas no mesmo contador esconderia problemas na base de origem.
 
-Registros descartados pelo filtro de campeonato não vão para o stderr — numa base
-grande eles seriam a maioria e afogariam o log.
+### 4. Nenhuma das duas é listada linha a linha
 
-### 4. Idioma dos nomes
+O stderr recebe só o progresso e o resumo. Um relatório com o número da linha e o
+motivo de cada registro recusado existiu e foi retirado: numa base de milhões de
+registros, um arquivo com muita linha ruim produz mais log do que dado, e o
+console fica inutilizável justamente quando se precisa dele. O que sobra são os
+dois contadores no resumo, que respondem a pergunta que importa — quanto entrou,
+quanto ficou de fora e por qual dos dois motivos.
 
-Comentários, documentação e identificadores em **português**; em inglês ficam só
-duas coisas, e por motivo:
+Como consequência, `LinhaInvalida` (`src/reader.ts`) carrega só o número da linha:
+o motivo e o trecho do conteúdo saíram junto, para não ficar payload montado a
+cada erro sem ninguém consumir.
 
-- as **chaves dos registros** (`club_id`, `founding_date`, `players`…), que
-  espelham o JSON de entrada — traduzi-las obrigaria a manter de cabeça um
-  de-para entre o arquivo lido e o código que o lê;
-- os **nomes de arquivo da infraestrutura** (`reader`, `writer`, `helpers`,
-  `constants`), contra os do domínio (`clube`, `jogador`), que ficam em
-  português.
+### 5. Idioma dos nomes
 
-Os nomes das colunas do CSV são em português porque o enunciado os define assim,
-letra por letra.
+Comentários, documentação e identificadores em **português**. Em inglês ficam só
+as **chaves dos registros** (`club_id`, `founding_date`, `players`…), que espelham
+o JSON de entrada — traduzi-las obrigaria a manter de cabeça um de-para entre o
+arquivo lido e o código que o lê —, e os **nomes de arquivo da infraestrutura**
+(`reader`, `writer`, `helpers`, `constants`), contra os do domínio (`clube`,
+`jogador`). Os nomes das colunas do CSV são em português porque o enunciado os
+define assim, letra por letra.
 
 ---
 
@@ -254,24 +226,20 @@ letra por letra.
 
 ### Nenhum registro derruba o processamento
 
-`JSON.parse` e a normalização rodam sob `try/catch` por linha. Linha inválida é
-reportada (número da linha, motivo e trecho do conteúdo) e o programa segue para
-a próxima. Também são tratados: arquivo inexistente ou sem permissão, erro de
-disco na escrita e fechamento do destino no meio da execução — todos com mensagem
-legível, resumo parcial e código de saída `1`.
+`JSON.parse` e a normalização rodam sob `try/catch` por linha: a linha inválida
+fica de fora, entra no contador e o programa segue. Também são tratados arquivo
+inexistente ou sem permissão, erro de disco na escrita e fechamento do destino no
+meio da execução — todos com mensagem legível, resumo parcial e código de saída
+`1`.
 
-Exemplo de execução sobre uma base propositalmente suja (JSON quebrado, linha que
-não é objeto, clube sem `club_id`, `players` que não é lista, item de `players`
-que não é objeto, data inexistente no calendário, campo objeto onde se espera
-escalar, linhas em branco e última linha sem quebra):
+Execução sobre uma base propositalmente suja (JSON quebrado, linha que não é
+objeto, clube sem `club_id`, `players` que não é lista, item de `players` que não
+é objeto, data inexistente no calendário, campo objeto onde se espera escalar,
+linhas em branco e última linha sem quebra):
 
 ```
-[linha 2] ERRO: JSON inválido: Unexpected token 'i', "isso nao e json" is not valid JSON
-[linha 2] conteúdo: isso nao e json
-[linha 4] ERRO: linha 4 sem club_id: chave obrigatória para ligar clube e jogadores
-[linha 4] conteúdo: {"championship":"SERIE A","name":"sem id"}
-
-Resumo: 6 clube(s) lido(s), 1 ignorado(s) por campeonato, 4 linha(s) com erro.
+Resumo: 4 clube(s) gravado(s), 1 ignorado(s) por campeonato, 4 linha(s) com erro.
+Gerados: clubs.csv (4 linha(s)), players.csv (2 linha(s)).
 ```
 
 Nenhuma dessas linhas interrompe a execução, e os dois CSVs saem válidos.
@@ -279,39 +247,34 @@ Nenhuma dessas linhas interrompe a execução, e os dois CSVs saem válidos.
 ### Memória constante
 
 - **Leitura em blocos.** `separarLinhas` (`src/reader.ts`) lê o disco em blocos de
-  256 KiB e mantém em memória apenas o resto após a última quebra de linha. Um
-  separador próprio foi usado no lugar do `readline` para poder impor um **teto
-  por linha** (8 MiB): um arquivo corrompido sem quebras de linha viraria OOM
-  antes de qualquer `JSON.parse`. Passando do teto, a linha é descartada na hora,
-  reportada como erro, e a leitura segue.
+  256 KiB e mantém em memória só o resto após a última quebra de linha. Um
+  separador próprio, no lugar do `readline`, permite impor um **teto por linha**
+  (8 MiB): um arquivo corrompido sem quebras viraria OOM antes de qualquer
+  `JSON.parse`. Passando do teto, a linha é descartada e contada como erro.
 - **Nada acumulado entre iterações.** O clube é lido, escrito e sai de escopo na
-  mesma iteração — junto com seus jogadores. Não há array de registros, nem
-  segunda passada pelo arquivo. Só contadores atravessam o laço.
+  mesma iteração, junto com seus jogadores. Só contadores atravessam o laço.
 - **Contrapressão de ponta a ponta.** Quando o CSV enche, o `await` na escrita
   segura o laço, e o `for await` só pede a próxima linha ao disco quando a
-  iteração termina. A leitura anda no ritmo da escrita, em vez de empilhar dados
-  na memória.
+  iteração termina.
 
 Medido em **1.572.864 linhas / 872 MB de entrada**, com o heap capado em 192 MB
 (`node --max-old-space-size=192 src/index.ts grande.jsonl`): 3.145.728 jogadores
 escritos em **40 s**, com pico de RSS de **94 MB** — estável do começo ao fim
-(89–94 MB do primeiro ao último bloco de progresso), contra ~50 MB no arquivo
-pequeno. O consumo acompanha o tamanho da maior linha, não o do arquivo.
+(89–94 MB do primeiro ao último bloco de progresso). O consumo acompanha o tamanho
+da maior linha, não o do arquivo.
 
 ### Testes
 
 47 testes no runner nativo do Node (`node --test`), sem framework externo:
 
-- **`tests/helpers.test.ts`** — as normalizações puras. Concentra os casos de borda
-  de data (calendário inválido, ano bissexto, formato ambíguo, ausência de
-  deslocamento por fuso, ano de dois dígitos) e a regra de valor composto em campo
-  escalar, que é a falha silenciosa mais perigosa do conjunto.
-- **`tests/clube.test.ts`** — filtro de campeonato, o que invalida o registro
-  inteiro e o que só custa um campo, e a propagação do `club_id` para os jogadores.
-- **`tests/reader.test.ts`** — a robustez da leitura sobre arquivos temporários:
-  linha inválida no meio não interrompe o restante, numeração fiel ao arquivo,
-  CRLF, BOM, última linha sem quebra, teto de tamanho por linha e falha de
-  abertura do arquivo.
+- **`helpers.test.ts`** — normalizações puras, com os casos de borda de data
+  (calendário inválido, bissexto, formato ambíguo, fuso, ano de dois dígitos) e
+  valor composto em campo escalar, a falha silenciosa mais perigosa do conjunto.
+- **`clube.test.ts`** — filtro de campeonato, o que invalida o registro inteiro
+  contra o que só custa um campo, propagação do `club_id` para os jogadores.
+- **`reader.test.ts`** — leitura sobre arquivos temporários: linha inválida no
+  meio, numeração fiel ao arquivo, CRLF, BOM, última linha sem quebra, teto de
+  tamanho por linha, falha de abertura.
 
 ---
 
@@ -350,40 +313,32 @@ cronológica — três fases de construção e duas revisões curtas:
 | 09/08 20:07 | [Revisão](docs/conversa-ia/revisao-cores.md) | `colors` fora do formato de lista | 1 | 20 |
 | 09/08 20:45 | [Fase 3](docs/conversa-ia/fase-3.md) | saída em CSV | 2 | 50 |
 
-São o transcrito das sessões, não um resumo: cada solicitação aparece com o texto
-exato que escrevi, cada resposta na íntegra, e as chamadas de ferramenta ficam
-recolhidas em blocos que abrem no clique. O cabeçalho de cada arquivo diz o que
-foi retirado do original (raciocínio interno do modelo, os blocos que o editor
-injeta sozinho, e o excedente de entrada/saída de ferramenta muito longa — este
-sempre marcado).
+São o transcrito das sessões, não um resumo: cada solicitação com o texto exato
+que escrevi, cada resposta na íntegra, e as chamadas de ferramenta recolhidas em
+blocos que abrem no clique. O cabeçalho de cada arquivo diz o que foi retirado do
+original (raciocínio interno do modelo, os blocos que o editor injeta sozinho, e o
+excedente de ferramenta muito longa — este sempre marcado).
 
 **Nem tudo que a IA propôs entrou**, e as duas revisões registram isso:
 
 - em `colors`, a resposta passava a **inferir separadores dentro de um texto**
   (`"verde, branco"` → `verde|branco`). Recusado: supor um separador inventa uma
   estrutura que a origem não declarou, e transformaria `"azul, com detalhe branco"`
-  em duas cores sem ninguém ver. O arquivo termina com a nota da decisão, e há um
-  teste travando a regra;
+  em duas cores sem ninguém ver. Há um teste travando a regra;
 - na varredura de código morto, o pedido era **reportar**, e vieram 7 achados já
-  corrigidos. Os 7 foram desfeitos, e a sessão termina com o typecheck limpo e a
-  execução idêntica. Três voltaram depois, um de cada vez e por decisão explícita
-  (a duplicação de `mensagemDoErro`, que virou o `helpers.ts`, e os tipos de
-  entrada que ninguém importava). Dois continuam de pé de propósito: o ramo
-  `bigint` de `normalizarTexto`, que tem teste, e os defaults de `lerFluxoJsonl`.
+  corrigidos. Os 7 foram desfeitos. Três voltaram depois, um de cada vez e por
+  decisão explícita; dois continuam de pé de propósito — o ramo `bigint` de
+  `normalizarTexto`, que tem teste, e os defaults de `lerFluxoJsonl`.
 
 A divisão de papéis foi a mesma do começo ao fim: arquitetura, regras de negócio e
 decisões técnicas são minhas; a IA escreveu código para solução já definida. Os
-pedidos descrevem o que implementar, onde, com que contrato e quais casos de borda
+pedidos dizem o que implementar, onde, com que contrato e quais casos de borda
 tratar — validar data em duas etapas sem usar `Date` para formatar a saída,
-rejeitar formatos ambíguos em vez de inferir a ordem dos campos, posicionar o
-filtro de campeonato antes da validação, trocar o `readline` por um separador de
-linhas próprio para impor teto por linha.
+rejeitar formatos ambíguos em vez de inferir a ordem dos campos, pôr o filtro de
+campeonato antes da validação, trocar o `readline` por um separador próprio para
+impor teto por linha. A ferramenta também foi usada neste README, nos comentários
+e na escrita dos testes, a partir da lista de casos de borda levantada durante o
+desenvolvimento.
 
 Estas sessões são onde o código nasceu, e não tudo o que houve: em volta delas
-correram conversas menores de discussão e revisão
-
-A ferramenta também foi usada na redação deste README, nos comentários do código e
-na escrita dos testes — nestes, a partir da lista de casos de borda levantada
-durante o desenvolvimento: data que passa na regex mas não existe no calendário,
-formato ambíguo, objeto em campo escalar, CRLF, BOM, última linha sem quebra e
-teto de tamanho por linha.
+correram conversas menores de discussão e revisão.

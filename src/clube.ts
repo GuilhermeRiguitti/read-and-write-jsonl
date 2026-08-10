@@ -18,13 +18,13 @@ import { CAMPEONATOS_ACEITOS, VAZIO } from "./constants.ts";
  * campo não há como afirmar que é A ou B, e chutar produziria informação errada
  * na saída.
  */
-export function ehClubeElegivel(value: unknown): boolean {
+export function ehClubeElegivel(valor: unknown): boolean {
   // Linha que nem objeto é não está "em outro campeonato": está malformada.
-  // Deixa passar para o validador reprovar, e assim ela é contada e reportada
-  // como erro em vez de sumir no contador de ignorados.
-  if (!ehObjeto(value)) return true;
+  // Deixa passar para o validador reprovar, e assim ela é contada como erro em
+  // vez de sumir no contador de ignorados.
+  if (!ehObjeto(valor)) return true;
 
-  const campeonato = chaveDeTexto(value.championship);
+  const campeonato = chaveDeTexto(valor.championship);
   if (campeonato === VAZIO) return false;
 
   return CAMPEONATOS_ACEITOS.has(campeonato);
@@ -47,17 +47,18 @@ export function ehClubeElegivel(value: unknown): boolean {
  * custa aquele campo, nunca o registro.
  *
  * Lança em caso de linha inválida; quem chama (o leitor) já captura, reporta e
- * passa para a próxima linha.
+ * passa para a próxima linha. A mensagem não repete o número da linha: o leitor
+ * é dono dessa contagem e já a prefixa no relatório.
  */
-export function validarClube(value: unknown, line: number): ClubeNormalizado {
-  if (!ehObjeto(value)) {
-    throw new Error(`linha ${line} não é um objeto JSON`);
+export function validarClube(valor: unknown): ClubeNormalizado {
+  if (!ehObjeto(valor)) {
+    throw new Error("não é um objeto JSON");
   }
 
-  const clube = normalizarClube(value);
+  const clube = normalizarClube(valor);
 
   if (clube.club_id === VAZIO) {
-    throw new Error(`linha ${line} sem club_id: chave obrigatória para ligar clube e jogadores`);
+    throw new Error("sem club_id: chave obrigatória para ligar clube e jogadores");
   }
 
   return clube;

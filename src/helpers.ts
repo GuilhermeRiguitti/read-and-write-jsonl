@@ -1,9 +1,9 @@
-import { PADRAO_DATA, SEPARADOR_LISTA, VAZIO } from "./constants.ts";
-
 /**
  * Funções pequenas e sem dependência de domínio, usadas por mais de um módulo.
  * Ponto único de manutenção para evitar cópias divergentes da mesma lógica.
  */
+
+import { PADRAO_DATA, SEPARADOR_LISTA, VAZIO } from "./constants.ts";
 
 /**
  * Texto legível de qualquer coisa lançada.
@@ -106,7 +106,7 @@ function existeNoCalendario(ano: number, mes: number, dia: number): boolean {
 }
 
 /**
- * Lista de escalares virar texto único ("preto|branco").
+ * Une uma lista de escalares em um único texto ("preto|branco").
  *
  * Itens sem representação escalar (objeto, lista aninhada) saem da lista, em vez
  * de virarem `[object Object]` no meio do campo.
@@ -124,4 +124,3 @@ export function normalizarListaTexto(valor: unknown): string {
     .filter((item) => item !== VAZIO)
     .join(SEPARADOR_LISTA);
 }
-

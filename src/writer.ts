@@ -15,10 +15,13 @@ export type Escritor = {
 };
 
 /**
- * Aqui o texto é agrupado em blocos de ~64 KiB (menos syscalls, mais vazão) e,
- * quando o destino sinaliza que está cheio, a escrita espera o `drain` antes de
- * continuar. Isso também segura o laço de leitura: o arquivo só avança no ritmo
- * em que a saída é consumida.
+ * Aqui o texto é agrupado até o `limite` informado (menos syscalls, mais vazão)
+ * e, quando o destino sinaliza que está cheio, a escrita espera o `drain` antes
+ * de continuar. Isso também segura o laço de leitura: o arquivo só avança no
+ * ritmo em que a saída é consumida.
+ *
+ * O padrão de 64 KiB serve à saída de dados; quem escreve diagnóstico passa um
+ * limite menor, para não deixar muito texto pendente em caso de interrupção.
  */
 export function criarEscritor(stream: Writable, limite: number = LIMITE_BUFFER_SAIDA): Escritor {
   let partes: string[] = [];

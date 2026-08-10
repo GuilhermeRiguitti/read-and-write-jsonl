@@ -1,11 +1,6 @@
 import { createReadStream } from "node:fs";
 import { StringDecoder } from "node:string_decoder";
-import {
-  LIMITE_TAMANHO_LINHA,
-  TAMANHO_BLOCO_LEITURA,
-  TAMANHO_TRECHO_ERRO,
-} from "./constants.ts";
-import { mensagemDoErro } from "./helpers.ts";
+import { LIMITE_TAMANHO_LINHA, TAMANHO_BLOCO_LEITURA } from "./constants.ts";
 
 /** Linha lida e convertida com sucesso. */
 export type LinhaLida<T> = {
@@ -14,13 +9,19 @@ export type LinhaLida<T> = {
   valor: T;
 };
 
-/** Linha incoerente: JSON inválido, fora do formato esperado ou grande demais. */
+/**
+ * Linha incoerente: JSON inválido, fora do formato esperado ou grande demais.
+ *
+ * Devolve o número da linha e nada mais. O motivo e um trecho do conteúdo
+ * chegaram a existir aqui, mas numa base grande com muitos registros ruins o
+ * relatório linha a linha afoga o stderr — mesmo motivo pelo qual as linhas
+ * recusadas pelo filtro também não são listadas. O que sobra é a contagem, no
+ * resumo do fim da execução.
+ */
 export type LinhaInvalida = {
   ok: false;
   ignorada?: false;
   linha: number;
-  trecho: string;
-  motivo: string;
 };
 
 /**
@@ -34,15 +35,19 @@ export type ResultadoDeLinha<T> = LinhaLida<T> | LinhaInvalida | LinhaIgnorada;
 
 /**
  * Valida/converte o JSON já parseado de uma linha. Deve lançar quando o
- * conteúdo não fizer sentido: o leitor captura e reporta a linha como inválida.
+ * conteúdo não fizer sentido: o leitor captura e devolve a linha como inválida.
+ *
+ * Recebe só o valor: a numeração das linhas é do leitor, que já a devolve em
+ * cada resultado
  */
-export type ValidadorDeLinha<T> = (valor: unknown, linha: number) => T;
+export type ValidadorDeLinha<T> = (valor: unknown) => T;
 
 /**
  * Decide se a linha interessa. Retornando `false`, a linha é descartada sem
- * passar pelo validador — nem entra no custo de normalizar, nem no de reportar.
+ * passar pelo validador: não paga o custo de ser normalizada nem entra no
+ * contador de erros.
  */
-export type FiltroDeLinha = (valor: unknown, linha: number) => boolean;
+export type FiltroDeLinha = (valor: unknown) => boolean;
 
 export type OpcoesDeLeitura<T> = {
   validar?: ValidadorDeLinha<T>;
@@ -52,7 +57,7 @@ export type OpcoesDeLeitura<T> = {
 /** Saída da tokenização interna, antes de virar JSON. */
 type LinhaBruta =
   | { linha: number; excedeu: false; texto: string }
-  | { linha: number; excedeu: true; caracteres: number; trecho: string };
+  | { linha: number; excedeu: true };
 
 /**
  * Lê um arquivo JSONL de forma incremental.
@@ -84,7 +89,7 @@ export async function* lerArquivoJsonl<T = unknown>(
 }
 
 /**
- * Etapa de leitura propriamente dita, separada da abertura do arquivo
+ * Etapa de leitura propriamente dita, separada da abertura do arquivo.
  */
 async function* lerFluxoJsonl<T = unknown>(
   origem: AsyncIterable<Buffer | string>,
@@ -92,12 +97,7 @@ async function* lerFluxoJsonl<T = unknown>(
 ): AsyncGenerator<ResultadoDeLinha<T>> {
   for await (const bruta of separarLinhas(origem)) {
     if (bruta.excedeu) {
-      yield {
-        ok: false,
-        linha: bruta.linha,
-        trecho: bruta.trecho,
-        motivo: `linha excede o limite de ${LIMITE_TAMANHO_LINHA} caracteres (${bruta.caracteres} descartados)`,
-      };
+      yield { ok: false, linha: bruta.linha };
       continue;
     }
 
@@ -120,15 +120,17 @@ async function* separarLinhas(origem: AsyncIterable<Buffer | string>): AsyncGene
   let numero = 0;
   let primeiroBloco = true;
 
-  // Estado do descarte de uma linha grande demais.
+  // Ligado enquanto se consome o resto de uma linha grande demais.
   let descartando = false;
-  let descartados = 0;
-  let trecho = "";
 
   for await (const bloco of origem) {
     pendente += typeof bloco === "string" ? bloco : decoder.write(bloco);
 
-    if (primeiroBloco) {
+    // A checagem só vale depois que houver ao menos um caractere: um bloco pode
+    // decodificar para string vazia se cair no meio de uma sequência UTF-8 (o
+    // próprio BOM tem 3 bytes), e desarmar a flag antes disso deixaria o BOM
+    // passar para dentro da primeira linha.
+    if (primeiroBloco && pendente.length > 0) {
       if (pendente.charCodeAt(0) === 0xfeff) pendente = pendente.slice(1); // BOM
       primeiroBloco = false;
     }
@@ -142,10 +144,8 @@ async function* separarLinhas(origem: AsyncIterable<Buffer | string>): AsyncGene
       numero += 1;
 
       if (descartando) {
-        yield { linha: numero, excedeu: true, caracteres: descartados + texto.length, trecho };
+        yield { linha: numero, excedeu: true };
         descartando = false;
-        descartados = 0;
-        trecho = "";
       } else {
         yield { linha: numero, excedeu: false, texto: removerCrFinal(texto) };
       }
@@ -157,12 +157,9 @@ async function* separarLinhas(origem: AsyncIterable<Buffer | string>): AsyncGene
     pendente = inicio === 0 ? pendente : pendente.slice(inicio);
 
     if (descartando) {
-      descartados += pendente.length;
       pendente = "";
     } else if (pendente.length > LIMITE_TAMANHO_LINHA) {
       descartando = true;
-      descartados = pendente.length;
-      trecho = pendente.slice(0, TAMANHO_TRECHO_ERRO);
       pendente = "";
     }
   }
@@ -171,7 +168,7 @@ async function* separarLinhas(origem: AsyncIterable<Buffer | string>): AsyncGene
 
   // Última linha, quando o arquivo não termina com quebra de linha.
   if (descartando) {
-    yield { linha: numero + 1, excedeu: true, caracteres: descartados + pendente.length, trecho };
+    yield { linha: numero + 1, excedeu: true };
   } else if (pendente !== "") {
     yield { linha: numero + 1, excedeu: false, texto: removerCrFinal(pendente) };
   }
@@ -192,18 +189,13 @@ function interpretarLinha<T>(
 
   try {
     conteudo = JSON.parse(bruta);
-  } catch (cause) {
-    return {
-      ok: false,
-      linha,
-      trecho: resumir(bruta),
-      motivo: `JSON inválido: ${mensagemDoErro(cause)}`,
-    };
+  } catch {
+    return { ok: false, linha };
   }
 
   // O filtro vem antes do validador de propósito: o que não interessa não paga
-  // o custo de ser normalizado nem corre o risco de ser reportado como erro.
-  if (filtrar && !filtrar(conteudo, linha)) {
+  // o custo de ser normalizado nem corre o risco de ser contado como erro.
+  if (filtrar && !filtrar(conteudo)) {
     return { ok: false, ignorada: true, linha };
   }
 
@@ -211,15 +203,11 @@ function interpretarLinha<T>(
     return { ok: true, linha, valor: conteudo as T };
   }
 
+  // O validador lança para recusar a linha; o erro em si não é propagado porque
+  // ninguém o consome — a linha só precisa ficar de fora e ser contada.
   try {
-    return { ok: true, linha, valor: validar(conteudo, linha) };
-  } catch (cause) {
-    return { ok: false, linha, trecho: resumir(bruta), motivo: mensagemDoErro(cause) };
+    return { ok: true, linha, valor: validar(conteudo) };
+  } catch {
+    return { ok: false, linha };
   }
-}
-
-/** Guarda só um trecho da linha inválida — o original é liberado em seguida. */
-function resumir(bruta: string): string {
-  const linha = bruta.trim();
-  return linha.length > TAMANHO_TRECHO_ERRO ? `${linha.slice(0, TAMANHO_TRECHO_ERRO)}...` : linha;
 }

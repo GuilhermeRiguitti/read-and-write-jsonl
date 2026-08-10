@@ -14,9 +14,15 @@ import { mensagemDoErro } from "./helpers.ts";
 import type { ClubeNormalizado } from "./models/clube.ts";
 import type { JogadorNormalizado } from "./models/jogador.ts";
 
-/** O que a execução produziu, para o relatório final. */
+/**
+ * O que a execução produziu, para o relatório final.
+ *
+ * `clubesEscritos` conta o que chegou ao CSV, não o que foi lido: as linhas
+ * recusadas pelo filtro e as inválidas entram nos outros dois contadores, e a
+ * soma dos três é o total de linhas do arquivo.
+ */
 type Contadores = {
-  lidos: number;
+  clubesEscritos: number;
   ignorados: number;
   invalidos: number;
   jogadoresEscritos: number;
@@ -58,7 +64,7 @@ async function main(): Promise<void> {
   const jogadores = criarEscritorCsv<JogadorNormalizado>(ARQUIVO_JOGADORES, COLUNAS_JOGADORES);
 
   const contadores: Contadores = {
-    lidos: 0,
+    clubesEscritos: 0,
     ignorados: 0,
     invalidos: 0,
     jogadoresEscritos: 0,
@@ -127,21 +133,24 @@ async function converter(
   for await (const resultado of lerArquivoJsonl<ClubeNormalizado>(caminho, opcoes)) {
     if (resultado.ok) {
       await clubes.write(resultado.valor);
-      contadores.lidos += 1;
+      contadores.clubesEscritos += 1;
 
       for (const jogador of resultado.valor.players) {
         await jogadores.write(jogador);
         contadores.jogadoresEscritos += 1;
       }
     } else if (resultado.ignorada) {
-      // Clube de outro campeonato não é erro: fica só no contador, porque num
-      // arquivo grande a maioria das linhas cairia aqui e afogaria o stderr.
+      // Clube de outro campeonato não é erro: entra num contador separado, para
+      // não se misturar com dado corrompido no resumo.
       contadores.ignorados += 1;
     } else {
+      // Nem a linha inválida nem a recusada pelo filtro vão para o stderr: numa
+      // base grande as duas seriam muitas, e o relatório linha a linha afogaria
+      // o console. As duas aparecem contadas no resumo do fim da execução.
       contadores.invalidos += 1;
     }
 
-    const processadas = contadores.lidos + contadores.ignorados + contadores.invalidos;
+    const processadas = contadores.clubesEscritos + contadores.ignorados + contadores.invalidos;
     if (processadas % INTERVALO_PROGRESSO === 0) {
       const rss = process.memoryUsage().rss;
       contadores.picoRss = Math.max(contadores.picoRss, rss);
@@ -175,10 +184,10 @@ async function relatar(log: Escritor, relatorio: Relatorio): Promise<void> {
   }
 
   await log.write(
-    `\nResumo: ${contadores.lidos} clube(s) lido(s), ` +
+    `\nResumo: ${contadores.clubesEscritos} clube(s) gravado(s), ` +
     `${contadores.ignorados} ignorado(s) por campeonato, ` +
     `${contadores.invalidos} linha(s) com erro.\n` +
-    `Gerados: ${ARQUIVO_CLUBES} (${contadores.lidos} linha(s)), ` +
+    `Gerados: ${ARQUIVO_CLUBES} (${contadores.clubesEscritos} linha(s)), ` +
     `${ARQUIVO_JOGADORES} (${contadores.jogadoresEscritos} linha(s)).\n` +
     `Tempo: ${segundos.toFixed(2)}s | pico de memória (rss): ${mb(contadores.picoRss)} MB\n`,
   );

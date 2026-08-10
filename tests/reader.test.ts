@@ -51,14 +51,12 @@ describe("lerArquivoJsonl", () => {
     assert.equal(resultados[2]?.ok, true);
   });
 
-  it("reporta número da linha, motivo e trecho do conteúdo", async () => {
+  it("distingue linha inválida de linha recusada pelo filtro", async () => {
     const [, invalida] = await ler("erro.jsonl", '{"a":1}\n{ quebrado\n');
 
-    assert.equal(invalida?.ok, false);
-    assert.equal(invalida.ignorada, undefined);
-    assert.equal(invalida.linha, 2);
-    assert.match(invalida.motivo, /JSON inválido/);
-    assert.equal(invalida.trecho, "{ quebrado");
+    // A ausência de `ignorada` é o que separa dado corrompido de registro fora
+    // do escopo: quem consome conta os dois em campos diferentes.
+    assert.deepEqual(invalida, { ok: false, linha: 2 });
   });
 
   it("mantém a numeração fiel ao arquivo, pulando linhas em branco", async () => {
@@ -93,8 +91,7 @@ describe("lerArquivoJsonl", () => {
     const resultados = await ler("gigante.jsonl", `${gigante}\n{"a":2}\n`);
 
     assert.equal(resultados.length, 2);
-    assert.equal(resultados[0]?.ok, false);
-    assert.match((resultados[0] as { motivo: string }).motivo, /excede o limite/);
+    assert.deepEqual(resultados[0], { ok: false, linha: 1 });
     // A leitura continua na linha seguinte, com a numeração correta.
     assert.deepEqual(resultados[1], { ok: true, linha: 2, valor: { a: 2 } });
   });
@@ -108,8 +105,8 @@ describe("lerArquivoJsonl", () => {
     assert.deepEqual(resultados[1], { ok: false, ignorada: true, linha: 2 });
   });
 
-  it("erro lançado pelo validador vira linha inválida", async () => {
-    const resultados = await ler("validar.jsonl", '{"a":1}\n{"a":2}\n', {
+  it("erro lançado pelo validador vira linha inválida, sem interromper a leitura", async () => {
+    const resultados = await ler("validar.jsonl", '{"a":1}\n{"a":2}\n{"a":3}\n', {
       validar: (valor) => {
         const { a } = valor as { a: number };
         if (a === 2) throw new Error("recusado pelo validador");
@@ -118,8 +115,8 @@ describe("lerArquivoJsonl", () => {
     });
 
     assert.equal(resultados[0]?.ok, true);
-    assert.equal(resultados[1]?.ok, false);
-    assert.match((resultados[1] as { motivo: string }).motivo, /recusado pelo validador/);
+    assert.deepEqual(resultados[1], { ok: false, linha: 2 });
+    assert.equal(resultados[2]?.ok, true);
   });
 
   it("falha de abertura sobe como erro, não como linha inválida", async () => {

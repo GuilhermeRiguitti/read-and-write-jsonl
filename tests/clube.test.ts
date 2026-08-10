@@ -48,7 +48,7 @@ describe("ehClubeElegivel", () => {
 
 describe("validarClube", () => {
   it("mapeia os campos de saída e descarta os demais", () => {
-    const clube = validarClube(CLUBE, 1);
+    const clube = validarClube(CLUBE);
 
     assert.equal(clube.club_id, "SCCP");
     assert.equal(clube.name, "Sport Club Corinthians Paulista");
@@ -58,7 +58,7 @@ describe("validarClube", () => {
   });
 
   it("propaga o club_id do clube para cada jogador", () => {
-    const clube = validarClube(CLUBE, 1);
+    const clube = validarClube(CLUBE);
 
     assert.equal(clube.players.length, 1);
     assert.equal(clube.players[0]?.club_id, "SCCP");
@@ -67,31 +67,33 @@ describe("validarClube", () => {
   });
 
   it("rejeita linha que não é objeto JSON", () => {
-    assert.throws(() => validarClube("linha solta", 7), /não é um objeto JSON/);
-    assert.throws(() => validarClube([1, 2], 7), /não é um objeto JSON/);
-    assert.throws(() => validarClube(null, 7), /não é um objeto JSON/);
+    assert.throws(() => validarClube("linha solta"), /não é um objeto JSON/);
+    assert.throws(() => validarClube([1, 2]), /não é um objeto JSON/);
+    assert.throws(() => validarClube(null), /não é um objeto JSON/);
   });
 
   it("rejeita clube sem club_id, a chave que liga os dois arquivos", () => {
-    assert.throws(() => validarClube({ ...CLUBE, club_id: null }, 2), /sem club_id/);
-    assert.throws(() => validarClube({ ...CLUBE, club_id: "  " }, 2), /sem club_id/);
+    assert.throws(() => validarClube({ ...CLUBE, club_id: null }), /sem club_id/);
+    assert.throws(() => validarClube({ ...CLUBE, club_id: "  " }), /sem club_id/);
 
     const { club_id: _ignorado, ...semId } = CLUBE;
-    assert.throws(() => validarClube(semId, 2), /sem club_id/);
+    assert.throws(() => validarClube(semId), /sem club_id/);
   });
 
   it("aceita jogador sem player_id: não é chave de ligação", () => {
-    const clube = validarClube({ ...CLUBE, players: [{ name: "Sem id" }] }, 1);
+    const clube = validarClube({ ...CLUBE, players: [{ name: "Sem id" }] });
 
     assert.equal(clube.players[0]?.player_id, "");
     assert.equal(clube.players[0]?.club_id, "SCCP");
   });
 
   it("campo fora de formato custa o campo, não o registro", () => {
-    const clube = validarClube(
-      { ...CLUBE, founding_date: "01/09/1910", nickname: null, president: { nome: "x" } },
-      1,
-    );
+    const clube = validarClube({
+      ...CLUBE,
+      founding_date: "01/09/1910",
+      nickname: null,
+      president: { nome: "x" },
+    });
 
     assert.equal(clube.founding_date, "");
     assert.equal(clube.nickname, "");
@@ -100,15 +102,15 @@ describe("validarClube", () => {
   });
 
   it("players fora do formato de lista vira elenco vazio", () => {
-    assert.deepEqual(validarClube({ ...CLUBE, players: "nao e lista" }, 1).players, []);
-    assert.deepEqual(validarClube({ ...CLUBE, players: null }, 1).players, []);
+    assert.deepEqual(validarClube({ ...CLUBE, players: "nao e lista" }).players, []);
+    assert.deepEqual(validarClube({ ...CLUBE, players: null }).players, []);
 
     const { players: _semElenco, ...semPlayers } = CLUBE;
-    assert.deepEqual(validarClube(semPlayers, 1).players, []);
+    assert.deepEqual(validarClube(semPlayers).players, []);
   });
 
   it("descarta item de players que não é objeto", () => {
-    const clube = validarClube({ ...CLUBE, players: ["texto", 42, { player_id: "A-1" }] }, 1);
+    const clube = validarClube({ ...CLUBE, players: ["texto", 42, { player_id: "A-1" }] });
 
     assert.equal(clube.players.length, 1);
     assert.equal(clube.players[0]?.player_id, "A-1");

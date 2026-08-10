@@ -1,9 +1,9 @@
 {
   "name": "teste-tecnico",
   "version": "1.0.0",
+  "private": true,
   "description": "Converte um JSONL de clubes de futebol em clubs.csv e players.csv, com leitura incremental para bases grandes.",
   "type": "module",
-  "main": "dist/index.js",
   "engines": {
     "node": ">=22.18"
   },
@@ -15,7 +15,6 @@
     "typecheck": "tsc"
   },
   "keywords": ["jsonl", "csv", "etl", "batch"],
-  "license": "ISC",
   "devDependencies": {
     "@types/node": "^26.2.0",
     "typescript": "^7.0.2"

@@ -6,13 +6,10 @@ export const TAMANHO_BLOCO_LEITURA = 256 * 1024;
 
 /**
  * Teto de caracteres para uma única linha. Uma linha maior que isso é descartada
- * e reportada como erro, em vez de crescer na memória sem limite (arquivo
+ * e contada como erro, em vez de crescer na memória sem limite (arquivo
  * corrompido, sem quebras de linha).
  */
 export const LIMITE_TAMANHO_LINHA = 8 * 1024 * 1024;
-
-/** Quantos caracteres da linha inválida manter no relatório. */
-export const TAMANHO_TRECHO_ERRO = 200;
 
 /** De quantos em quantos registros o progresso é reportado no stderr. */
 export const INTERVALO_PROGRESSO = 100_000;
