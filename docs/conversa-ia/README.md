@@ -24,6 +24,5 @@ Duas delas mostram o limite do que foi aceito da IA:
 - **código morto** termina com os 7 achados desfeitos: o pedido era reportar, não
   corrigir.
 
-Em volta destas correram outras conversas de discussão e ajuste, cujo resultado
-está no código e nas decisões registradas no
-[README](../../README.md#decisões-tomadas).
+Em volta destas correram outras conversas de solicitacoes de pequenos ajuste e algumas dúvidas que surgiram ao longo
+da criaçao da aplicaçao.
