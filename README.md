@@ -84,6 +84,27 @@ Colunas e mapeamento JSON → CSV estão em [`docs/DECISOES.md`](docs/DECISOES.m
 
 ---
 
+## Testes
+
+Os testes cobrem as funções puras de `reader.ts` e `writer.ts`, validando apenas
+**entrada e saída** (sem mockar detalhes internos de stream além do necessário
+para `criarEscritor`).
+
+| Arquivo | O que valida |
+| --- | --- |
+| `test/reader.spec.ts` | `removerCrFinal`, `interpretarLinha` e leitura incremental via `lerArquivoJsonl` |
+| `test/writer.spec.ts` | bufferização e `flush` de `criarEscritor` |
+
+```bash
+npm test
+npm run test:coverage
+```
+
+`npm test` roda a suíte com o runner nativo do Node (`node:test`) e `tsx`.
+`npm run test:coverage` gera o relatório em `coverage/` com `c8`.
+
+---
+
 ## Estrutura
 
 ```
@@ -113,3 +134,4 @@ Desenvolvido com apoio de assistente de IA. Sessões em
 | 09/08 | [Fase 2](docs/conversa-ia/fase-2.md) | filtro por campeonato |
 | 09/08 | [Fase 3](docs/conversa-ia/fase-3.md) | saída em CSV |
 | 10/08 | [Buffer do log](docs/conversa-ia/simplificar-buffer-log.md) | simplificação do stderr |
+| 10/08 | [Testes unitários](docs/conversa-ia/testes-unitarios.md) | testes de `reader` e `writer` |

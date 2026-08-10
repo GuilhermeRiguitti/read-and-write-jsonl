@@ -113,11 +113,11 @@ async function* separarLinhas(origem: AsyncIterable<Buffer | string>): AsyncGene
   }
 }
 
-function removerCrFinal(texto: string): string {
+export function removerCrFinal(texto: string): string {
   return texto.endsWith("\r") ? texto.slice(0, -1) : texto;
 }
 
-function interpretarLinha<T>(
+export function interpretarLinha<T>(
   bruta: string,
   linha: number,
   opcoes: OpcoesDeLeitura<T>,
