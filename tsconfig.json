@@ -1,7 +1,10 @@
 {
+  // Config que o editor carrega sozinho (é o `tsconfig.json` mais próximo de
+  // qualquer arquivo do projeto), por isso cobre `src/` e `tests/`. Só verifica
+  // tipos; quem gera `dist/` é o tsconfig.build.json, que reaproveita estas
+  // regras e restringe o `rootDir` a `src` para não arrastar os testes ao build.
   "compilerOptions": {
-    "rootDir": "./src",
-    "outDir": "./dist",
+    "noEmit": true,
     "module": "nodenext",
     "target": "esnext",
     "lib": ["esnext"],
@@ -26,5 +29,5 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
 }

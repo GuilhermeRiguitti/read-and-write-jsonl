@@ -36,7 +36,16 @@ Exemplos:
 
 ```bash
 node src/index.ts sample_clubes.jsonl
+```
+
+```bash
 node src/index.ts /dados/base_completa.jsonl
+```
+
+Pelo npm, o `--` separa os argumentos do programa dos do npm:
+
+```bash
+npm run dev -- /dados/base_completa.jsonl
 ```
 
 Sem parâmetro, o programa usa `sample_clubes.jsonl` como padrão.
@@ -72,6 +81,12 @@ Tempo: 0.02s | pico de memória (rss): 70.1 MB
 Código de saída `1` em caso de falha na leitura ou na escrita; `0` caso contrário.
 Linhas inválidas **não** alteram o código de saída — são reportadas e o
 processamento segue.
+
+O caminho de entrada é conferido **antes** de os CSVs serem abertos: caminho
+inexistente ou pasta no lugar do arquivo encerram com código `1` sem tocar nos
+arquivos da execução anterior (`createWriteStream` trunca o destino já na
+abertura, então abrir primeiro apagaria um resultado bom por causa de um erro de
+digitação).
 
 ---
 
@@ -208,7 +223,7 @@ Portanto: clube sem `club_id` é reportado como erro e descartado, junto com seu
 jogadores. `player_id` ausente **não** invalida nada — não é chave de ligação, só
 vira campo vazio.
 
-### 4. Linha malformada é erro, não "ignorado"
+### 3. Linha malformada é erro, não "ignorado"
 
 Linha que não é objeto JSON é contada e reportada como **erro**, não como
 "ignorado por campeonato". São situações diferentes: uma é dado corrompido, a
@@ -217,6 +232,21 @@ esconderia problemas na base de origem.
 
 Registros descartados pelo filtro de campeonato não vão para o stderr — numa base
 grande eles seriam a maioria e afogariam o log.
+
+### 4. Idioma dos nomes
+
+Comentários, documentação e identificadores em **português**; em inglês ficam só
+duas coisas, e por motivo:
+
+- as **chaves dos registros** (`club_id`, `founding_date`, `players`…), que
+  espelham o JSON de entrada — traduzi-las obrigaria a manter de cabeça um
+  de-para entre o arquivo lido e o código que o lê;
+- os **nomes de arquivo da infraestrutura** (`reader`, `writer`, `helpers`,
+  `constants`), contra os do domínio (`clube`, `jogador`), que ficam em
+  português.
+
+Os nomes das colunas do CSV são em português porque o enunciado os define assim,
+letra por letra.
 
 ---
 
@@ -229,6 +259,22 @@ reportada (número da linha, motivo e trecho do conteúdo) e o programa segue pa
 a próxima. Também são tratados: arquivo inexistente ou sem permissão, erro de
 disco na escrita e fechamento do destino no meio da execução — todos com mensagem
 legível, resumo parcial e código de saída `1`.
+
+Exemplo de execução sobre uma base propositalmente suja (JSON quebrado, linha que
+não é objeto, clube sem `club_id`, `players` que não é lista, item de `players`
+que não é objeto, data inexistente no calendário, campo objeto onde se espera
+escalar, linhas em branco e última linha sem quebra):
+
+```
+[linha 2] ERRO: JSON inválido: Unexpected token 'i', "isso nao e json" is not valid JSON
+[linha 2] conteúdo: isso nao e json
+[linha 4] ERRO: linha 4 sem club_id: chave obrigatória para ligar clube e jogadores
+[linha 4] conteúdo: {"championship":"SERIE A","name":"sem id"}
+
+Resumo: 6 clube(s) lido(s), 1 ignorado(s) por campeonato, 4 linha(s) com erro.
+```
+
+Nenhuma dessas linhas interrompe a execução, e os dois CSVs saem válidos.
 
 ### Memória constante
 
@@ -246,8 +292,11 @@ legível, resumo parcial e código de saída `1`.
   iteração termina. A leitura anda no ritmo da escrita, em vez de empilhar dados
   na memória.
 
-Medido em 1.572.864 linhas (195 MB de entrada), com heap capado em 192 MB: pico de
-RSS de **114 MB**, estável do começo ao fim, contra ~50 MB no arquivo pequeno.
+Medido em **1.572.864 linhas / 872 MB de entrada**, com o heap capado em 192 MB
+(`node --max-old-space-size=192 src/index.ts grande.jsonl`): 3.145.728 jogadores
+escritos em **40 s**, com pico de RSS de **94 MB** — estável do começo ao fim
+(89–94 MB do primeiro ao último bloco de progresso), contra ~50 MB no arquivo
+pequeno. O consumo acompanha o tamanho da maior linha, não o do arquivo.
 
 ### Testes
 
@@ -281,7 +330,7 @@ tests/            testes do runner nativo do Node
 docs/conversa-ia/ histórico das sessões de desenvolvimento com IA
 ```
 
-O leitor (`reader.ts`) não conhece o domínio: recebe um `filter` e um `validate`
+O leitor (`reader.ts`) não conhece o domínio: recebe um `filtrar` e um `validar`
 opcionais e devolve, por linha, um de três resultados — lida, ignorada pelo filtro
 ou inválida. Toda regra de clube fica em `clube.ts`.
 
@@ -289,25 +338,49 @@ ou inválida. Toda regra de clube fica em `clube.ts`.
 
 ## Uso de IA
 
-Este projeto foi desenvolvido com apoio de um assistente de IA, e as sessões estão
-exportadas na íntegra em [`docs/conversa-ia/`](docs/conversa-ia/):
+Este projeto foi desenvolvido com apoio de um assistente de IA (Claude Code). O
+**export das sessões** está em [`docs/conversa-ia/`](docs/conversa-ia/), em ordem
+cronológica — três fases de construção e duas revisões curtas:
 
-- [fase 1](docs/conversa-ia/fase-1.md) — leitura do JSONL, leitura incremental,
-  mapeamento dos campos e normalização;
-- [fase 2](docs/conversa-ia/fase-2.md) — filtro por campeonato e tolerância a
-  campos fora de formato;
-- [fase 3](docs/conversa-ia/fase-3.md) — saída em CSV.
+| Quando | Sessão | Sobre | Solicitações | Ferramentas |
+| --- | --- | --- | --- | --- |
+| 07/08 20:58 | [Fase 1](docs/conversa-ia/fase-1.md) | leitura do JSONL, leitura incremental, mapeamento dos campos e normalização | 7 | 72 |
+| 09/08 02:39 | [Revisão](docs/conversa-ia/revisao-codigo-morto.md) | parâmetro sem uso, comentário desatualizado e código morto | 4 | 54 |
+| 09/08 17:05 | [Fase 2](docs/conversa-ia/fase-2.md) | filtro por campeonato e tolerância a campo fora de formato | 3 | 33 |
+| 09/08 20:07 | [Revisão](docs/conversa-ia/revisao-cores.md) | `colors` fora do formato de lista | 1 | 20 |
+| 09/08 20:45 | [Fase 3](docs/conversa-ia/fase-3.md) | saída em CSV | 2 | 50 |
+
+São o transcrito das sessões, não um resumo: cada solicitação aparece com o texto
+exato que escrevi, cada resposta na íntegra, e as chamadas de ferramenta ficam
+recolhidas em blocos que abrem no clique. O cabeçalho de cada arquivo diz o que
+foi retirado do original (raciocínio interno do modelo, os blocos que o editor
+injeta sozinho, e o excedente de entrada/saída de ferramenta muito longa — este
+sempre marcado).
+
+**Nem tudo que a IA propôs entrou**, e as duas revisões registram isso:
+
+- em `colors`, a resposta passava a **inferir separadores dentro de um texto**
+  (`"verde, branco"` → `verde|branco`). Recusado: supor um separador inventa uma
+  estrutura que a origem não declarou, e transformaria `"azul, com detalhe branco"`
+  em duas cores sem ninguém ver. O arquivo termina com a nota da decisão, e há um
+  teste travando a regra;
+- na varredura de código morto, o pedido era **reportar**, e vieram 7 achados já
+  corrigidos. Os 7 foram desfeitos, e a sessão termina com o typecheck limpo e a
+  execução idêntica. Três voltaram depois, um de cada vez e por decisão explícita
+  (a duplicação de `mensagemDoErro`, que virou o `helpers.ts`, e os tipos de
+  entrada que ninguém importava). Dois continuam de pé de propósito: o ramo
+  `bigint` de `normalizarTexto`, que tem teste, e os defaults de `lerFluxoJsonl`.
 
 A divisão de papéis foi a mesma do começo ao fim: arquitetura, regras de negócio e
 decisões técnicas são minhas; a IA escreveu código para solução já definida. Os
-pedidos nas sessões descrevem o que implementar, onde, com que contrato e quais
-casos de borda tratar — validar data em duas etapas sem usar `Date` para formatar
-a saída, rejeitar formatos ambíguos em vez de inferir a ordem dos campos,
-posicionar o filtro de campeonato antes da validação, trocar o `readline` por um
-separador de linhas próprio para impor teto por linha.
+pedidos descrevem o que implementar, onde, com que contrato e quais casos de borda
+tratar — validar data em duas etapas sem usar `Date` para formatar a saída,
+rejeitar formatos ambíguos em vez de inferir a ordem dos campos, posicionar o
+filtro de campeonato antes da validação, trocar o `readline` por um separador de
+linhas próprio para impor teto por linha.
 
-Por isso os transcritos não cobrem a estrutura completa da aplicação: boa parte do
-código foi escrita manualmente, e o que veio da IA passou por ajuste depois.
+Estas sessões são onde o código nasceu, e não tudo o que houve: em volta delas
+correram conversas menores de discussão e revisão
 
 A ferramenta também foi usada na redação deste README, nos comentários do código e
 na escrita dos testes — nestes, a partir da lista de casos de borda levantada

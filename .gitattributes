@@ -1,0 +1,10 @@
+# Os arquivos de dados são entregues como o programa os grava: UTF-8 e fim de
+# linha LF. Sem isto, o `core.autocrlf` de uma máquina Windows entrega CSV com
+# CRLF, diferente do que o README descreve.
+*.csv text eol=lf
+*.jsonl text eol=lf
+
+# Código e docs também ficam em LF, para o diff não virar arquivo inteiro.
+*.ts text eol=lf
+*.md text eol=lf
+*.json text eol=lf

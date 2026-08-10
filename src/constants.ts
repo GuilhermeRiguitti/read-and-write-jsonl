@@ -1,17 +1,18 @@
-export const FILE_SOURCE = "sample_clubes.jsonl";
+/** Entrada usada quando o programa é chamado sem caminho. */
+export const ARQUIVO_ENTRADA_PADRAO = "sample_clubes.jsonl";
 
 /** Bloco lido do disco por vez. */
-export const CHUNK_SIZE = 256 * 1024;
+export const TAMANHO_BLOCO_LEITURA = 256 * 1024;
 
 /**
  * Teto de caracteres para uma única linha. Uma linha maior que isso é descartada
  * e reportada como erro, em vez de crescer na memória sem limite (arquivo
  * corrompido, sem quebras de linha).
  */
-export const MAX_LINE_LENGTH = 8 * 1024 * 1024;
+export const LIMITE_TAMANHO_LINHA = 8 * 1024 * 1024;
 
 /** Quantos caracteres da linha inválida manter no relatório. */
-export const RAW_PREVIEW_LENGTH = 200;
+export const TAMANHO_TRECHO_ERRO = 200;
 
 /** De quantos em quantos registros o progresso é reportado no stderr. */
 export const INTERVALO_PROGRESSO = 100_000;

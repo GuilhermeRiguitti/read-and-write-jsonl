@@ -1,12 +1,13 @@
-import { readJsonlFile } from "./reader.ts";
+import { stat } from "node:fs/promises";
+import { lerArquivoJsonl } from "./reader.ts";
 import { criarEscritor, criarEscritorCsv, type Escritor, type EscritorCsv } from "./writer.ts";
 import { ehClubeElegivel, validarClube } from "./clube.ts";
 import {
   ARQUIVO_CLUBES,
+  ARQUIVO_ENTRADA_PADRAO,
   ARQUIVO_JOGADORES,
   COLUNAS_CLUBES,
   COLUNAS_JOGADORES,
-  FILE_SOURCE,
   INTERVALO_PROGRESSO,
 } from "./constants.ts";
 import { mensagemDoErro } from "./helpers.ts";
@@ -29,7 +30,7 @@ type Destinos = {
 };
 
 async function main(): Promise<void> {
-  const caminho = process.argv[2] ?? FILE_SOURCE;
+  const caminho = process.argv[2] ?? ARQUIVO_ENTRADA_PADRAO;
 
   // Registros vão para os CSVs; diagnóstico (progresso, erros, resumo) para o
   // stderr, para que a saída em arquivo não se misture com o relatório.
@@ -39,6 +40,19 @@ async function main(): Promise<void> {
   const log = criarEscritor(process.stderr, 4 * 1024);
 
   await log.write(`Lendo JSONL: ${caminho}\n`);
+
+  // A entrada é conferida ANTES de abrir os CSVs porque `createWriteStream`
+  // trunca o arquivo já na abertura: um caminho errado na linha de comando
+  // apagaria o resultado da execução anterior e deixaria dois arquivos só com
+  // cabeçalho no lugar dele.
+  try {
+    await conferirEntrada(caminho);
+  } catch (cause) {
+    await log.write(`\nEntrada inválida: ${mensagemDoErro(cause)}\n`);
+    await log.flush();
+    process.exitCode = 1;
+    return;
+  }
 
   const clubes = criarEscritorCsv<ClubeNormalizado>(ARQUIVO_CLUBES, COLUNAS_CLUBES);
   const jogadores = criarEscritorCsv<JogadorNormalizado>(ARQUIVO_JOGADORES, COLUNAS_JOGADORES);
@@ -85,6 +99,18 @@ async function main(): Promise<void> {
 }
 
 /**
+ * Confere que o caminho recebido dá para ler antes de qualquer escrita.
+ *
+ * Não substitui o `try/catch` da leitura — o arquivo pode sumir ou falhar depois
+ * daqui —, mas cobre o caso comum (caminho errado, pasta no lugar do arquivo)
+ * enquanto ainda dá para desistir sem tocar na saída anterior.
+ */
+async function conferirEntrada(caminho: string): Promise<void> {
+  const info = await stat(caminho);
+  if (!info.isFile()) throw new Error(`${caminho} não é um arquivo`);
+}
+
+/**
  * Laço central: uma passada pelo arquivo, escrevendo os dois CSVs.
  *
  * Cada clube é lido, escrito e sai de escopo na mesma iteração, junto com seus
@@ -96,26 +122,26 @@ async function converter(
   { clubes, jogadores, log }: Destinos,
   contadores: Contadores,
 ): Promise<void> {
-  const opcoes = { validate: validarClube, filter: ehClubeElegivel };
+  const opcoes = { validar: validarClube, filtrar: ehClubeElegivel };
 
-  for await (const resultado of readJsonlFile<ClubeNormalizado>(caminho, opcoes)) {
+  for await (const resultado of lerArquivoJsonl<ClubeNormalizado>(caminho, opcoes)) {
     if (resultado.ok) {
-      await clubes.write(resultado.value);
+      await clubes.write(resultado.valor);
       contadores.lidos += 1;
 
-      for (const jogador of resultado.value.players) {
+      for (const jogador of resultado.valor.players) {
         await jogadores.write(jogador);
         contadores.jogadoresEscritos += 1;
       }
-    } else if (resultado.skipped) {
+    } else if (resultado.ignorada) {
       // Clube de outro campeonato não é erro: fica só no contador, porque num
       // arquivo grande a maioria das linhas cairia aqui e afogaria o stderr.
       contadores.ignorados += 1;
     } else {
       contadores.invalidos += 1;
       await log.write(
-        `[linha ${resultado.line}] ERRO: ${resultado.reason}\n` +
-        `[linha ${resultado.line}] conteúdo: ${resultado.raw}\n`,
+        `[linha ${resultado.linha}] ERRO: ${resultado.motivo}\n` +
+        `[linha ${resultado.linha}] conteúdo: ${resultado.trecho}\n`,
       );
     }
 
